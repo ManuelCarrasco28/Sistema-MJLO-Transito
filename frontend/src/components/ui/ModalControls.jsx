@@ -29,7 +29,7 @@ export function BotonCancelar({ onClick, children = 'Cancelar', className = '', 
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl px-4 py-1.5 font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-1.5 font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       style={{ backgroundColor: COLOR_CANCELAR, fontSize: '12px', lineHeight: '1.5' }}
     >
       {children}
@@ -43,7 +43,7 @@ export function BotonGuardar({ children = 'Guardar', type = 'submit', onClick, c
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl px-5 py-1.5 font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl px-5 py-1.5 font-bold text-white transition hover:opacity-90 active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
       style={{ backgroundColor: COLOR_GUARDAR, fontSize: '12px', lineHeight: '1.5' }}
     >
       {children}

@@ -15,7 +15,7 @@ export async function fetchTodasLasFilas(endpoint, params = {}, opciones = {}) {
     const consulta = armarConsulta(params)
     consulta.set('page', String(pagina))
     consulta.set(campoPorPagina, String(porPagina))
-    const respuesta = await apiFetch(`${endpoint}?${consulta.toString()}`, { signal: controller.signal })
+    const respuesta = await apiFetch(`${endpoint}?${consulta.toString()}`, { signal: controller.signal, sinCache: true })
     if (!respuesta.ok) throw new Error(`No se pudo leer ${endpoint} (HTTP ${respuesta.status})`)
     const cuerpo = await respuesta.json()
     if (controller.signal.aborted) throw new DOMException('Descarga cancelada', 'AbortError')

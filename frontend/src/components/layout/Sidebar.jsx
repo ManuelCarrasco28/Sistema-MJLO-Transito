@@ -300,7 +300,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   }`}
                 >
                   <Icon name={mainItem.icon} className={`size-4 shrink-0 ${selected ? '' : grpCfg.color}`} />
-                  <span className="text-[12.5px] font-semibold uppercase tracking-tight truncate flex-1">{mainItem.label}</span>
+                  <span className="text-[12.5px] font-semibold uppercase tracking-tight min-w-0 break-words flex-1">{mainItem.label}</span>
                 </button>
               )
             }
@@ -317,7 +317,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                   }`}
                 >
                   <Icon name={grpCfg.icon} className={`size-4 shrink-0 ${groupSelected && !expandedGroups[group.name] ? '' : grpCfg.color}`} />
-                  <span className="text-[12.5px] font-semibold uppercase tracking-tight truncate flex-1">{group.name}</span>
+                  <span className="text-[12.5px] font-semibold uppercase tracking-tight min-w-0 break-words flex-1">{group.name}</span>
                   <Icon
                     name="chevronDown"
                     className={`size-3.5 shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${expandedGroups[group.name] ? 'rotate-180' : ''}`}
@@ -345,7 +345,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
                           }`}
                         >
                           <Icon name={item.icon} className={`size-4 shrink-0 ${selected ? 'text-[#5B6EE1] dark:text-indigo-300' : 'text-slate-400 dark:text-slate-500'}`} />
-                          <span className="text-[12.5px] tracking-tight truncate flex-1">{item.label}</span>
+                          <span className="text-[12.5px] tracking-tight min-w-0 break-words flex-1">{item.label}</span>
                         </button>
                       )
                     })}
@@ -371,7 +371,7 @@ export function Sidebar({ activeItem, onSelect, mobileOpen, onClose, onLogout, c
             <span className={`grid ${collapsedOnDesktop ? 'size-[32px]' : 'size-6'} shrink-0 place-items-center rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500 transition-transform duration-150 group-hover:scale-105`}>
               <Icon name="logout" className={collapsedOnDesktop ? 'size-5' : 'size-3.5'} />
             </span>
-            <span className={`text-[12.5px] font-bold tracking-tight truncate flex-1 text-red-600 dark:text-red-400 ${collapsedOnDesktop ? 'lg:hidden' : ''}`}>
+            <span className={`text-[12.5px] font-bold tracking-tight min-w-0 break-words flex-1 text-red-600 dark:text-red-400 ${collapsedOnDesktop ? 'lg:hidden' : ''}`}>
               Cerrar sesión
             </span>
           </button>

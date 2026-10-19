@@ -16,11 +16,102 @@ export function resolverUrlArchivo(url) {
 
 
 const memoryCache = new Map()
+
+// Lecturas recientes. Los listados y las estadísticas se muestran al instante aunque el dato guardado
+// sea viejo (hasta 10 min) y se refrescan en segundo plano; si algo cambió, avisan a la pantalla con
+// el evento "mjlo:datos-nuevos". Solo se guardan listados, estadísticas y catálogos: las fichas de un
+// registro (que se usan para editar), los reportes de caja y las descargas siempre van al servidor.
+// Cualquier cambio (crear, editar, eliminar) las borra todas; también se borran al cerrar sesión.
+const respuestasGet = new Map()
+// Versión (fecha de última modificación) con que se leyó cada registro: se devuelve al guardar para
+// que el servidor detecte si otra persona lo modificó mientras tanto.
+const versionesRegistro = new Map()
+const revalidando = new Set()
+const FRESCO_LISTA_MS = 15000
+const MAX_VIEJO_LISTA_MS = 600000
+const MAX_RESPUESTAS_GET = 80
+const MAX_TEXTO_GUARDADO = 1500000
+
+// Otras pestañas del mismo navegador: un cambio en una borra lo guardado en las demás y las hace releer.
+const canalDatos = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('mjlo-datos') : null
+if (canalDatos) {
+  canalDatos.unref?.()
+  canalDatos.onmessage = (evento) => {
+    respuestasGet.clear()
+    window.dispatchEvent(new CustomEvent('mjlo:datos-nuevos', { detail: { endpoint: String(evento.data?.endpoint || '') } }))
+  }
+}
+const ES_LISTA = /[?&]page=|\/estadisticas(?:[?/]|$)|^\/(?:usuarios|usuarios\/roles|asociaciones|tipo-documentos|tipos-infraccion|catalogo-infracciones|inspeccion-criterios|procedimientos-admin)(?:\?|$)/
+const SIN_CACHE = /^\/(?:me|login|logout|status|notificaciones|pide|ruc|dashboard|auditoria|mobile|files|export-pdf|municipalidad|configuracion-sistema)(?:[/?]|$)|siguiente-correlativo|certicav-estado|arqueo/
+
+const rutaDe = (endpoint) => (endpoint.startsWith('/') ? endpoint : `/${endpoint}`)
+const esJson = (respuesta) => /json/i.test(respuesta.headers?.get('content-type') || '')
+
+const admiteCache = (method, endpoint, opciones, sinCache) => (
+  method === 'GET'
+  && !sinCache
+  && !/^https?:\/\//.test(endpoint)
+  && ES_LISTA.test(rutaDe(endpoint))
+  && !SIN_CACHE.test(rutaDe(endpoint))
+  && !opciones.headers?.['Cache-Control']
+)
+
+// Pide el dato nuevo sin que la pantalla espere. Si cambió, renueva el guardado y avisa.
+function refrescarEnSegundoPlano(url, endpoint) {
+  if (revalidando.has(url)) return
+  revalidando.add(url)
+  fetch(url, { credentials: 'include', headers: { Accept: 'application/json' } })
+    .then(async (respuesta) => {
+      redirigirSiSesionExpirada(respuesta, url)
+      if (!respuesta.ok || !esJson(respuesta)) {
+        // Si el servidor falla, no se sigue mostrando lo viejo: la próxima lectura irá a la red y mostrará el error.
+        if (respuesta.status !== 401) respuestasGet.delete(url)
+        return
+      }
+      const texto = await respuesta.text()
+      const actual = respuestasGet.get(url)
+      // Si un cambio borró el guardado mientras tanto, esta respuesta puede ser anterior: se descarta.
+      if (!actual) return
+      const cambio = texto !== actual.texto
+      guardarRespuestaGet(url, texto)
+      registrarVersiones(endpoint, texto)
+      if (cambio) window.dispatchEvent(new CustomEvent('mjlo:datos-nuevos', { detail: { endpoint } }))
+    })
+    .catch(() => { respuestasGet.delete(url) })
+    .finally(() => revalidando.delete(url))
+}
+
+const partesDeRuta = (endpoint) => rutaDe(endpoint.split('?')[0]).split('/').filter(Boolean)
+
+// Recuerda la versión de cada registro que aparece en una lectura (listado o ficha).
+function registrarVersiones(endpoint, texto) {
+  if (!texto.includes('versionRegistro')) return
+  const [recurso, id, ...resto] = partesDeRuta(endpoint)
+  if (!recurso || resto.length || (id !== undefined && !/^[\w-]+$/.test(id))) return
+  try {
+    const datos = JSON.parse(texto)?.data
+    const filas = Array.isArray(datos) ? datos : [datos]
+    filas.forEach((fila) => {
+      if (!fila || typeof fila !== 'object' || fila.id == null || !fila.versionRegistro) return
+      versionesRegistro.set(`${recurso}/${fila.id}`, fila.versionRegistro)
+      if (fila.uuid) versionesRegistro.set(`${recurso}/${fila.uuid}`, fila.versionRegistro)
+    })
+  } catch { /* respuesta sin el formato esperado */ }
+}
+
+function guardarRespuestaGet(url, texto) {
+  respuestasGet.delete(url)
+  if (texto.length > MAX_TEXTO_GUARDADO) return
+  respuestasGet.set(url, { texto, hora: Date.now() })
+  if (respuestasGet.size > MAX_RESPUESTAS_GET) respuestasGet.delete(respuestasGet.keys().next().value)
+}
 const pendingReads = new Map()
 const peticionesActivas = new Set()
 
 window.addEventListener('mjlo:limpiar-sesion', () => {
   memoryCache.clear()
+  respuestasGet.clear()
+  versionesRegistro.clear()
   pendingReads.clear()
   for (const controller of peticionesActivas) controller.abort()
   peticionesActivas.clear()
@@ -88,7 +179,7 @@ function redirigirSiSesionExpirada(response, url) {
 }
 
 export async function apiFetch(endpoint, options = {}) {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, sinCache = false, ...fetchOptions } = options
   const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
     ? endpoint
     : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
@@ -99,12 +190,24 @@ export async function apiFetch(endpoint, options = {}) {
   }
 
   let body = fetchOptions.body
+  const method = (fetchOptions.method || 'GET').toUpperCase()
+  const edita = method === 'PUT' || method === 'PATCH'
   if (body && typeof body === 'object' && !(body instanceof FormData)) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json'
+    if (edita && 'versionRegistro' in body) {
+      // La versión con que se abrió el formulario viaja como cabecera, no como dato a guardar.
+      const { versionRegistro, ...sinVersion } = body
+      if (versionRegistro && !headers['X-Version-Registro']) headers['X-Version-Registro'] = String(versionRegistro)
+      body = sinVersion
+    }
     body = JSON.stringify(body)
   }
 
-  const method = (fetchOptions.method || 'GET').toUpperCase()
+  const [recursoEdicion, idEdicion, ...restoEdicion] = edita ? partesDeRuta(endpoint) : []
+  const claveVersion = recursoEdicion && idEdicion && !restoEdicion.length ? `${recursoEdicion}/${idEdicion}` : null
+  if (edita && claveVersion && !headers['X-Version-Registro'] && versionesRegistro.has(claveVersion)) {
+    headers['X-Version-Registro'] = versionesRegistro.get(claveVersion)
+  }
   const controller = new AbortController()
   peticionesActivas.add(controller)
   const externalSignal = fetchOptions.signal
@@ -122,6 +225,20 @@ export async function apiFetch(endpoint, options = {}) {
     signal: controller.signal,
   }
 
+  const usaCache = admiteCache(method, endpoint, fetchOptions, sinCache)
+  if (usaCache) {
+    const reciente = respuestasGet.get(url)
+    const edad = reciente ? Date.now() - reciente.hora : Infinity
+    if (reciente && edad < MAX_VIEJO_LISTA_MS) {
+      if (edad >= FRESCO_LISTA_MS) refrescarEnSegundoPlano(url, endpoint)
+      peticionesActivas.delete(controller)
+      window.clearTimeout(timeoutId)
+      externalSignal?.removeEventListener('abort', cancelar)
+      registrarVersiones(endpoint, reciente.texto)
+      return new Response(reciente.texto, { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+  }
+
   // Share only default reads while they are in flight. Each caller gets its
   // own body, and subsequent visits still request fresh server data.
   try {
@@ -135,6 +252,11 @@ export async function apiFetch(endpoint, options = {}) {
       }
       const shared = await request
       redirigirSiSesionExpirada(shared, url)
+      if (shared.ok && esJson(shared) && (usaCache || partesDeRuta(endpoint).length <= 2)) {
+        const texto = await shared.clone().text()
+        if (usaCache) guardarRespuestaGet(url, texto)
+        if (partesDeRuta(endpoint).length <= 2) registrarVersiones(endpoint, texto)
+      }
       return shared.clone()
     }
 
@@ -142,7 +264,26 @@ export async function apiFetch(endpoint, options = {}) {
 
     redirigirSiSesionExpirada(response, url)
 
+    if (method === 'GET' && response.ok && esJson(response) && (usaCache || partesDeRuta(endpoint).length <= 2)) {
+      const texto = await response.clone().text()
+      if (usaCache) guardarRespuestaGet(url, texto)
+      if (partesDeRuta(endpoint).length <= 2) registrarVersiones(endpoint, texto)
+    }
+
+    if (edita && claveVersion) {
+      if (response.ok) {
+        versionesRegistro.delete(claveVersion)
+      } else if (response.status === 409) {
+        // Otra persona guardó antes: se descarta lo guardado y las pantallas vuelven a leer el dato nuevo.
+        respuestasGet.clear()
+        versionesRegistro.delete(claveVersion)
+        window.dispatchEvent(new CustomEvent('mjlo:datos-nuevos', { detail: { endpoint } }))
+      }
+    }
+
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method) && response.ok) {
+      respuestasGet.clear()
+      canalDatos?.postMessage({ endpoint })
       const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '').split('/')[0]
       if (cleanEndpoint === 'login' || cleanEndpoint === 'logout') {
         peticionesActivas.delete(controller)

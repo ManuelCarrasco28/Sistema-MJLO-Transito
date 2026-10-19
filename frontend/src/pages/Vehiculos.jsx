@@ -23,6 +23,8 @@ import { PersonaFormModal } from '../components/personas/PersonaFormModal'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { esRolOficina } from '../config/roles'
 import { obtenerAnioFormularioVehiculo } from '../utils/anioSunarp'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 function formatTipoDocLabel(t) {
   const code = (t.codigo || '').toUpperCase().trim()
@@ -533,6 +535,8 @@ export function Vehiculos({ user }) {
     return () => cargaVehiculos.current?.abort()
   }, [currentPage, itemsPerPage, debouncedSearchTerm, filterTipo, filterEstado, filterActivo, sortBy, sortDir])
 
+  useRecargaSilenciosa('/vehiculos', [() => loadVehiculos(), () => loadStats()])
+
   const getPersonaNombre = (persona) => (
     persona.nombreCompleto ||
     `${persona.nombres || ''} ${persona.apellidoPaterno || persona.apellido_paterno || ''} ${persona.apellidoMaterno || persona.apellido_materno || ''}`.trim()
@@ -994,13 +998,13 @@ export function Vehiculos({ user }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Asociación / Empresa</p>
-                <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
+                <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200">
                   {isVehiculoFormal(consultaResult) ? (consultaResult.asociacion || 'NO ASIGNADA') : 'PARTICULAR'}
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-[var(--border)] dark:bg-[var(--bg-subtle)]">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Propietario / Titular</p>
-                <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200 line-clamp-2">
+                <p className="mt-1.5 text-lg font-black text-slate-800 dark:text-slate-200">
                   {consultaResult.propietario || 'NO REGISTRADO'}
                 </p>
               </div>
@@ -1122,8 +1126,8 @@ export function Vehiculos({ user }) {
 
           <div className="relative order-1 min-w-[240px] flex-1">
             <Icon
-              name={isLoading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-blue-500' : 'text-slate-400'}`}
+              name="search"
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
             />
             <input
               type="text"
@@ -1265,22 +1269,7 @@ export function Vehiculos({ user }) {
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity duration-150 ${isLoading && vehiculos.length > 0 ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
               {isLoading && vehiculos.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-3.5 py-2.5"><div className="h-6 w-20 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-2.5">
-                      <div className="space-y-1.5">
-                        <div className="h-3.5 w-32 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" />
-                        <div className="h-2.5 w-20 rounded bg-slate-100 dark:bg-[var(--bg-subtle)]" />
-                      </div>
-                    </td>
-                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-2.5"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-3.5 py-2.5"><div className="h-4 w-24 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="px-4 py-2.5 min-w-[130px] text-center"><div className="mx-auto h-5 w-20 rounded-full bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                    <td className="sticky right-0 z-10 bg-white dark:bg-[#1C2438] border-l border-slate-200 dark:border-[var(--border)] px-4 py-4 min-w-[165px] shadow-[-4px_0_8px_rgba(0,0,0,0.04)]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={7} />
               ) : vehiculos.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center">

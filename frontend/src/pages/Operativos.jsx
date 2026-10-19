@@ -15,6 +15,7 @@ import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/
 import { sanitizeCellValue } from '../utils/exportHelpers'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { puedeEliminarRegistros } from '../config/roles'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const getPeruDateInputValue = () => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -138,6 +139,8 @@ export function Operativos({ user }) {
       .catch(() => { if (!controller.signal.aborted) setLoadError('No se pudo cargar el módulo de operativos.') })
     return () => controller.abort()
   }, [page, itemsPerPage, debouncedSearch, estado, fechaFiltro, sortBy, sortDir])
+
+  useRecargaSilenciosa('/operativos', [() => loadOperativos().catch(() => {}), () => loadStats()])
 
   useEffect(() => {
     apiFetch('/personal?porPagina=200&tipoInspector=TRANSITO')
@@ -638,10 +641,10 @@ export function Operativos({ user }) {
 
       <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white shadow-sm dark:border-[var(--border)] dark:bg-[#1C2438]">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-[var(--border)]">
-          <div className="relative w-full sm:max-w-xs">
+          <div className="relative w-full sm:min-w-0 sm:flex-1">
             <Icon
-              name={loading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors ${loading ? 'animate-spin text-purple-500' : 'text-slate-400'}`}
+              name="search"
+              className={`absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors text-slate-400`}
             />
             <input
               value={search}
@@ -764,7 +767,7 @@ export function Operativos({ user }) {
                 <tr>
                   <td colSpan="6" className="p-12 text-center">
                     {loading ? (
-                      <p className="text-xs text-slate-500">Cargando operativos...</p>
+                      <Icon name="refresh" className="mx-auto size-9 animate-spin text-indigo-500" aria-label="Cargando" />
                     ) : (
                       <>
                         <Icon name="operations" className="size-10 mb-2 mx-auto text-slate-300 dark:text-slate-600" />
@@ -1066,13 +1069,13 @@ export function Operativos({ user }) {
                           <td className="px-4 py-2.5 text-center">
                             <PlacaVehiculo placa={r.placa} />
                             {(r.vehiculo_marca || r.vehiculo_modelo || r.vehiculo_color) && (
-                              <p className="mt-0.5 text-[10px] text-slate-400 truncate max-w-[120px] mx-auto">
+                              <p className="mt-0.5 text-[10px] text-slate-400 min-w-0 break-words max-w-[120px] mx-auto">
                                 {[r.vehiculo_marca, r.vehiculo_modelo, r.vehiculo_color].filter(Boolean).join(' ')}
                               </p>
                             )}
                           </td>
                           <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300 font-medium">
-                            <p className="line-clamp-2">{r.observaciones || 'Sin observaciones'}</p>
+                            <p className="">{r.observaciones || 'Sin observaciones'}</p>
                           </td>
                           <td className="px-4 py-2.5 text-center">
                             <div className="flex flex-col items-center gap-1">

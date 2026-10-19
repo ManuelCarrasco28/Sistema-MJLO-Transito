@@ -8,7 +8,7 @@ import { NotFound } from './pages/NotFound'
 import { PREFETCH_MAP } from './config/navigation'
 import { apiFetch } from './config/api'
 import { limpiarDatosLocales } from './utils/sesionLocal'
-import { esRolOficina, definirRolActual } from './config/roles'
+import { esRolOficina, esRolCampo, definirRolActual } from './config/roles'
 
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000
 
@@ -25,6 +25,7 @@ const CursosSeguridad = lazy(() => import('./pages/CursosSeguridad').then((modul
 const Pagos = lazy(() => import('./pages/Pagos').then((module) => ({ default: module.Pagos })))
 const Retenciones = lazy(() => import('./pages/Retenciones').then((module) => ({ default: module.Retenciones })))
 const Permisos = lazy(() => import('./pages/Permisos').then((module) => ({ default: module.Permisos })))
+const ProcedimientosTarifas = lazy(() => import('./pages/ProcedimientosTarifas').then((module) => ({ default: module.ProcedimientosTarifas })))
 const PermisoFormularioVentana = lazy(() => import('./pages/PermisoFormularioVentana').then((module) => ({ default: module.PermisoFormularioVentana })))
 const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then((module) => ({ default: module.SuperAdminDashboard })))
 const Usuarios = lazy(() => import('./pages/Usuarios').then((module) => ({ default: module.Usuarios })))
@@ -105,6 +106,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
     if (p.startsWith('/pagos'))                    return 'Pagos'
     if (p.startsWith('/internamientos') || p.startsWith('/retenciones')) return 'Internamientos'
     if (p.startsWith('/permisos'))                 return 'Permisos y Autorizaciones'
+    if (p.startsWith('/procedimientos-tarifas'))   return 'Procedimientos y tarifas'
     return 'Dashboard'
   }, [location.pathname])
 
@@ -207,7 +209,7 @@ function Layout({ onLogout, user, onUserUpdate }) {
       if (!siguiente) return
       const [path, fn] = siguiente
         // Filtrar rutas superadmin si no aplica, y rutas de office si no aplica
-        const needsOffice = ['/personas','/trabajadores','/asociaciones','/documentos','/permisos','/cursos','/pagos','/impresion'].includes(path)
+        const needsOffice = ['/personas','/trabajadores','/asociaciones','/documentos','/permisos','/procedimientos-tarifas','/cursos','/pagos','/impresion'].includes(path)
       if (needsOffice && !isOff) { programar(); return }
       fn().catch(() => {}).finally(() => { if (!cancelled) programar() })
     }
@@ -309,7 +311,7 @@ function App() {
         const response = await apiFetch('/me')
         if (!response.ok) throw response
         const payload = await response.json()
-        if (String(payload.data?.rol || '').toUpperCase() === 'TRABAJADOR') {
+        if (esRolCampo(payload.data?.rol)) {
           // El inspector solo usa la app móvil: se cierra cualquier sesión suya abierta en el navegador
           apiFetch('/logout', { method: 'POST' }).catch(() => {})
           throw new Error('rol-movil')
@@ -424,6 +426,14 @@ function App() {
           />
 
           <Route
+            path="/cursos/detalle"
+            element={user ? (
+              <Suspense fallback={<ModuleFallback />}>
+                <CursoDetalleVentana />
+              </Suspense>
+            ) : <Navigate to="/login" replace />}
+          />
+          <Route
             path="/cursos/:id/popup"
             element={user ? (
               <Suspense fallback={<ModuleFallback />}>
@@ -457,6 +467,7 @@ function App() {
             <Route path="/internamientos" element={onlyNormalUser(user, <Retenciones user={user} />)} />
             <Route path="/retenciones" element={onlyNormalUser(user, <Navigate to="/internamientos" replace />)} />
             <Route path="/permisos" element={onlyOfficeUser(user, <Permisos />)} />
+            <Route path="/procedimientos-tarifas" element={onlyOfficeUser(user, <ProcedimientosTarifas />)} />
           </Route>
 
           {/* Página 404 independiente y completa para cualquier ruta desconocida */}

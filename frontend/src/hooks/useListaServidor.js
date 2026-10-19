@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../config/api'
+import { useRecargaSilenciosa } from './useRecargaSilenciosa'
 
 const identidad = (fila) => fila
 
@@ -64,6 +65,8 @@ export function useListaServidor({ endpoint, params = {}, page, porPagina, activ
       peticionActiva.current?.abort()
     }
   }, [activo, recargar])
+
+  useRecargaSilenciosa(endpoint, [recargar])
 
   return { filas, total, isLoading, error, recargar }
 }

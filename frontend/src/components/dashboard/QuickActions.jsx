@@ -214,13 +214,13 @@ export function QuickActions({ user }) {
                 </div>
                 <div className="min-w-0">
                   <h5 
-                    className="text-sm font-extrabold text-[#2B3674] dark:text-white transition-colors truncate"
+                    className="text-sm font-extrabold text-[#2B3674] dark:text-white transition-colors min-w-0 break-words"
                     onMouseEnter={(e) => { e.currentTarget.style.color = action.color }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = '' }}
                   >
                     {action.title}
                   </h5>
-                  <p className="text-[11px] font-medium text-[#A3AED0] mt-0.5 truncate">{action.desc}</p>
+                  <p className="text-[11px] font-medium text-[#A3AED0] mt-0.5 min-w-0 break-words">{action.desc}</p>
                 </div>
               </a>
             );
@@ -295,7 +295,7 @@ function CustomizeModal({ availableShortcuts, initialSelection, onSave, onClose 
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold text-slate-700 dark:text-white truncate">
+                    <div className="text-sm font-bold text-slate-700 dark:text-white min-w-0 break-words">
                       {shortcut.title}
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">

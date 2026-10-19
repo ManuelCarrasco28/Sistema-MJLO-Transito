@@ -726,6 +726,9 @@ export function FloatingSelect({
   className = '',
   multilineOptions = false,
   hideEmptyOption = false,
+  placeholder = '',
+  menuGrande = false,
+  error = '',
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPos, setMenuPos] = useState(null)
@@ -764,20 +767,30 @@ export function FloatingSelect({
   const handleToggle = () => {
     if (!isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
-      const menuHeight = Math.min(224, options.length * 36 + 8)
+      // Altura real del menú: las opciones grandes miden más y la lista con buscador suma su caja de búsqueda
+      const tope = menuGrande ? 288 : 192
+      const filaAlto = menuGrande ? 44 : 36
+      const menuHeight = Math.min(tope, options.length * filaAlto + 8 + (options.length > UMBRAL_BUSQUEDA ? 44 : 0))
       const spaceBelow = window.innerHeight - rect.bottom
-      const openUpwards = spaceBelow < menuHeight + 8 && rect.top > spaceBelow
+      const spaceAbove = rect.top
+      const openUpwards = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow
+      // Si no cabe ni arriba ni abajo, el menú se encoge al espacio libre y se desplaza por dentro
+      const espacio = (openUpwards ? spaceAbove : spaceBelow) - 16
       setMenuPos({
         left: rect.left,
         width: rect.width,
         top: openUpwards ? undefined : rect.bottom + 4,
         bottom: openUpwards ? window.innerHeight - rect.top + 4 : undefined,
+        altoMaximo: Math.max(120, Math.min(tope, espacio)),
       })
     }
     setIsOpen((prev) => !prev)
   }
 
-  const selectedOption = options.find((opt) => opt.value === value) || options[0]
+  const opcionElegida = options.find((opt) => opt.value === value)
+  // Con placeholder no se finge una selección: mientras no se elija nada se ve el texto de ayuda.
+  const sinElegir = Boolean(placeholder) && !opcionElegida
+  const selectedOption = opcionElegida || (placeholder ? undefined : options[0])
   const buscador = useOpcionesBuscables(options, isOpen)
   const elegir = (opt) => {
     onChange({ target: { value: opt.value } })
@@ -790,13 +803,16 @@ export function FloatingSelect({
         type="button"
         id={id}
         onClick={handleToggle}
+        aria-invalid={error ? true : undefined}
         className={`flex ${multilineOptions ? 'min-h-[42px] items-start' : 'h-[42px] items-center'} w-full justify-between rounded-xl border bg-white px-3 pt-3.5 pb-1 text-left text-xs font-semibold text-slate-800 outline-none transition-all dark:bg-[var(--bg-subtle)] dark:text-white cursor-pointer ${
           isOpen
             ? 'border-blue-500 ring-1 ring-blue-500/20 dark:border-blue-400'
-            : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
+            : error
+              ? 'border-red-500 dark:border-red-500'
+              : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
         }`}
       >
-        <span className={multilineOptions ? 'min-w-0 whitespace-normal break-words pr-1 leading-snug' : 'truncate pr-1'}>{selectedOption?.label || value}</span>
+        <span className={`${multilineOptions ? 'min-w-0 whitespace-normal break-words pr-1 leading-snug' : 'truncate pr-1'} ${sinElegir ? 'font-normal text-slate-400 dark:text-slate-500' : ''}`}>{sinElegir ? placeholder : (selectedOption?.label || value)}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -816,11 +832,12 @@ export function FloatingSelect({
       <label
         htmlFor={id}
         className={`pointer-events-none absolute left-3 top-1 text-[9.5px] font-bold select-none transition-all duration-150 ${
-          isOpen ? '!text-blue-600 dark:!text-blue-400' : 'text-slate-500 dark:text-slate-400'
+          isOpen ? '!text-blue-600 dark:!text-blue-400' : error ? '!text-red-600 dark:!text-red-400' : 'text-slate-500 dark:text-slate-400'
         }`}
       >
         {label}
       </label>
+      {error && <p role="alert" className="mt-1 px-1 text-[11px] leading-4 font-medium text-red-600 dark:text-red-400">{error}</p>}
 
       {isOpen && menuPos && createPortal(
         <div
@@ -832,7 +849,7 @@ export function FloatingSelect({
             width: multilineOptions ? Math.min(menuPos.width, window.innerWidth - 32) : 'max-content',
             minWidth: buscador.buscable
               ? Math.min(Math.max(menuPos.width, 220), window.innerWidth - 32)
-              : Math.min(menuPos.width, 150),
+              : menuGrande ? Math.min(menuPos.width, window.innerWidth - 32) : Math.min(menuPos.width, 150),
             maxWidth: buscador.buscable
               ? Math.min(Math.max(menuPos.width, 300), window.innerWidth - 32)
               : Math.min(menuPos.width, window.innerWidth - 32),
@@ -841,7 +858,7 @@ export function FloatingSelect({
           }}
           className="z-[100] rounded-lg border border-slate-200 bg-white p-0.5 shadow-xl shadow-slate-900/15 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className="custom-scrollbar max-h-48 overflow-y-auto overscroll-contain">
+          <div style={{ maxHeight: menuPos.altoMaximo }} className={`custom-scrollbar overflow-y-auto overscroll-contain ${menuGrande ? 'max-h-72 p-1' : 'max-h-48'}`}>
             {buscador.buscable && (
               <BuscadorOpciones
                 texto={buscador.texto}
@@ -865,8 +882,8 @@ export function FloatingSelect({
                   ref={(el) => { if (el && resaltada) el.scrollIntoView({ block: 'nearest' }) }}
                   onClick={() => elegir(opt)}
                   // La regla global "button { font: inherit }" anula las clases text-*, por eso el tamaño va en línea.
-                  style={{ fontSize: '11px', lineHeight: '1.25' }}
-                  className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 transition-colors cursor-pointer text-left ${
+                  style={{ fontSize: menuGrande ? '13.5px' : '11px', lineHeight: menuGrande ? '1.35' : '1.25' }}
+                  className={`flex w-full items-center justify-between gap-2 rounded-md ${menuGrande ? 'px-3 py-2.5' : 'px-2 py-1'} transition-colors cursor-pointer text-left ${
                     isSelected
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-bold'
                       : resaltada
@@ -884,7 +901,7 @@ export function FloatingSelect({
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="size-2.5 text-blue-600 dark:text-blue-400 shrink-0"
+                      className={`${menuGrande ? 'size-3.5' : 'size-2.5'} text-blue-600 dark:text-blue-400 shrink-0`}
                     >
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
@@ -910,7 +927,27 @@ export function RoundedSelect({
   align = 'end',
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [alineacion, setAlineacion] = useState(align)
   const containerRef = useRef(null)
+  const menuRef = useRef(null)
+
+  // El menú se alinea hacia donde cabe: si por un lado se sale del área de contenido, se abre por el otro.
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setAlineacion(align)
+      return
+    }
+    const contenedor = containerRef.current
+    const menu = menuRef.current
+    if (!contenedor || !menu) return
+    const limite = (contenedor.closest('main') || document.documentElement).getBoundingClientRect()
+    const boton = contenedor.getBoundingClientRect()
+    const ancho = menu.getBoundingClientRect().width
+    const cabeAlFinal = boton.right - ancho >= limite.left + 8
+    const cabeAlInicio = boton.left + ancho <= limite.right - 8
+    if (align === 'start') setAlineacion(cabeAlInicio || !cabeAlFinal ? 'start' : 'end')
+    else setAlineacion(cabeAlFinal || !cabeAlInicio ? 'end' : 'start')
+  }, [isOpen, align])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -958,7 +995,7 @@ export function RoundedSelect({
       </button>
 
       {isOpen && (
-        <div className={`absolute ${align === 'start' ? 'left-0' : 'right-0'} top-full mt-1.5 min-w-full w-max z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100 ${
+        <div ref={menuRef} className={`absolute ${alineacion === 'start' ? 'left-0' : 'right-0'} top-full mt-1.5 min-w-full w-max z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-xl shadow-slate-900/10 dark:border-[var(--border-strong)] dark:bg-[var(--bg-subtle)] animate-in fade-in zoom-in-95 duration-100 ${
           buscador.buscable ? 'min-w-[240px] max-w-[min(360px,calc(100vw-2rem))]' : 'max-w-[320px]'
         }`}>
           <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar">

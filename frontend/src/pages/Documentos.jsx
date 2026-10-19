@@ -19,6 +19,8 @@ import { formatFecha, formatNumeroTarjeta, normalizarPlaca } from '../utils/form
 import { BotonCancelar, BotonCerrarModal, BotonGuardar } from '../components/ui/ModalControls'
 import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { puedeEliminarRegistros } from '../config/roles'
+import { FilaCargando } from '../components/ui/FilaCargando'
+import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const TIPO_DOC_OPTIONS = [
   { value: 'TARJETA_OPERATIVIDAD', label: 'Tarjeta de Operatividad (TUC)' },
@@ -227,6 +229,8 @@ export function Documentos() {
     setLoadError('')
     loadData()
   }, [currentPage, itemsPerPage, debouncedSearch, filterTipo, filterEstado, sortBy, sortDir])
+
+  useRecargaSilenciosa('/documentos', [() => loadData(), () => loadStats()])
 
   const [stats, setStats] = useState({ total: 0, tucDocs: 0, soatDocs: 0, vigentes: 0, inactivosOVencidos: 0 })
 
@@ -845,8 +849,8 @@ export function Documentos() {
         <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1">
             <Icon
-              name={isLoading ? "refresh" : "search"}
-              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${isLoading ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+              name="search"
+              className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
             />
             <input
               type="text"
@@ -953,34 +957,7 @@ export function Documentos() {
             </thead>
             <tbody className={`divide-y divide-slate-100 dark:divide-[var(--border)] transition-opacity ${isLoading && documentos.length > 0 ? 'opacity-50' : ''}`}>
               {isLoading && documentos.length === 0 ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-28 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-5 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-36 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-4 w-20 rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="h-5 w-16 rounded-full" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                    <td
-                      className="sticky right-0 z-10 px-4 py-3 text-right"
-                      style={{ backgroundColor: 'var(--bg-surface)' }}
-                    >
-                      <div className="h-7 w-20 ml-auto rounded" style={{ backgroundColor: 'var(--bg-subtle)' }} />
-                    </td>
-                  </tr>
-                ))
+                <FilaCargando colSpan={7} />
               ) : filteredDocs.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-12 text-center">
@@ -1028,12 +1005,12 @@ export function Documentos() {
                     <td className="px-4 py-3 max-w-[200px]">
                       <div>
                         <p
-                          className="font-bold text-xs text-slate-900 dark:text-white truncate"
+                          className="font-bold text-xs text-slate-900 dark:text-white min-w-0 break-words"
                           title={d.propietario}
                         >
                           {d.propietario || 'Sin Propietario Asignado'}
                         </p>
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 min-w-0 break-words">
                           {d.propietarioDni && (
                             <span className="font-mono font-semibold">DNI: {d.propietarioDni}</span>
                           )}
@@ -1231,7 +1208,7 @@ export function Documentos() {
                                 }`}
                               >
                                 <span className="font-mono font-bold">{v.placa}</span>
-                                <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                                <span className="text-[11px] text-slate-400 min-w-0 break-words max-w-[150px]">
                                   {v.propietario || v.marca || 'Registrado'}
                                 </span>
                               </button>
@@ -1270,7 +1247,7 @@ export function Documentos() {
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block leading-tight">
                           Propietario en Padrón
                         </span>
-                        <span className="font-bold text-slate-800 dark:text-white truncate block leading-tight">
+                        <span className="font-bold text-slate-800 dark:text-white min-w-0 break-words block leading-tight">
                           {formData.propietario || 'Sin Propietario Asignado en BD'}
                         </span>
                       </div>
@@ -1281,7 +1258,7 @@ export function Documentos() {
                           </span>
                         )}
                         {formData.asociacion && (
-                          <span className="text-[10px] text-slate-400 truncate block mt-0.5">
+                          <span className="text-[10px] text-slate-400 min-w-0 break-words block mt-0.5">
                             {formData.asociacion}
                           </span>
                         )}

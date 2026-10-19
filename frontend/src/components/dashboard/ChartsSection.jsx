@@ -949,15 +949,15 @@ export function ChartsSection({ data, loading = false, user }) {
                         <div className="grid grid-cols-3 gap-1.5 text-xs">
                           <div className="min-w-0 rounded-xl bg-[#F4F7FE] dark:bg-white/5 px-2 py-1.5">
                             <p className="font-bold text-[#EE5D50] text-[10px]">Multas</p>
-                            <p className="truncate text-[13px] font-black text-[#2B3674] dark:text-white"><Contador value={item.multas} /></p>
+                            <p className="min-w-0 break-words text-[13px] font-black text-[#2B3674] dark:text-white"><Contador value={item.multas} /></p>
                           </div>
                           <div className="min-w-0 rounded-xl bg-[#F4F7FE] dark:bg-white/5 px-2 py-1.5">
                             <p className="font-bold text-[#01B574] text-[10px]">Pagos</p>
-                            <p className="truncate text-[13px] font-black text-[#2B3674] dark:text-white"><Contador value={item.pagos} /></p>
+                            <p className="min-w-0 break-words text-[13px] font-black text-[#2B3674] dark:text-white"><Contador value={item.pagos} /></p>
                           </div>
                           <div className="min-w-0 rounded-xl bg-[#F4F7FE] dark:bg-white/5 px-2 py-1.5">
                             <p className="font-bold text-[#FFB547] text-[10px]">Pend.</p>
-                            <p className="truncate text-[13px] font-black text-[#2B3674] dark:text-white"><Contador value={item.pendiente} /></p>
+                            <p className="min-w-0 break-words text-[13px] font-black text-[#2B3674] dark:text-white"><Contador value={item.pendiente} /></p>
                           </div>
                         </div>
                       </button>

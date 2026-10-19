@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Icon } from './Icon'
+import { Cargando } from './Cargando'
 import { BotonCerrarModal } from './ModalControls'
 
 export function parseCoordenadas(value) {
@@ -132,7 +133,7 @@ export function MapaPreviewModal({ isOpen, onClose, coordenadas, title, direccio
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white min-w-0 break-words">
                   {title}
                 </h3>
                 {tipo === 'ASOCIACION' && (
@@ -146,7 +147,7 @@ export function MapaPreviewModal({ isOpen, onClose, coordenadas, title, direccio
                   </span>
                 )}
               </div>
-              <p className="font-mono text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+              <p className="font-mono text-xs text-slate-500 dark:text-slate-400 min-w-0 break-words mt-0.5">
                 {coordenadas} {direccion ? `· ${direccion}` : ''}
               </p>
             </div>
@@ -256,9 +257,9 @@ export function MapaTodasUbicacionesModal({ isOpen, onClose, items = [], cargand
               <Icon name="mapPin" className="size-4.5" />
             </span>
             <div className="min-w-0">
-              <h3 className="truncate text-base font-bold text-slate-900 dark:text-white">{titulo}</h3>
+              <h3 className="min-w-0 break-words text-base font-bold text-slate-900 dark:text-white">{titulo}</h3>
               <p className="flex flex-wrap items-center gap-x-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                <span>{cargando ? 'Cargando ubicaciones…' : `${puntos.length} ubicaciones`}</span>
+                <span>{cargando ? 'Ubicaciones' : `${puntos.length} ubicaciones`}</span>
                 <span className="inline-flex items-center gap-1"><span style={{ color: COLOR_TIPO_MAPA.ASOCIACION }}><Icon name="mapPin" className="size-3.5" /></span>Asociaciones ({asociaciones})</span>
                 <span className="inline-flex items-center gap-1"><span style={{ color: COLOR_TIPO_MAPA.PARTICULAR }}><Icon name="mapPin" className="size-3.5" /></span>Particulares ({particulares})</span>
               </p>
@@ -268,7 +269,7 @@ export function MapaTodasUbicacionesModal({ isOpen, onClose, items = [], cargand
         </div>
         <div className="h-[72vh] w-full bg-slate-100 dark:bg-[#1C2438]">
           {cargando ? (
-            <div className="grid h-full place-items-center text-sm font-semibold text-slate-400">Cargando mapa…</div>
+            <Cargando className="h-full" />
           ) : puntos.length === 0 ? (
             <div className="grid h-full place-items-center text-sm font-semibold text-slate-400">No hay ubicaciones con coordenadas para mostrar.</div>
           ) : (

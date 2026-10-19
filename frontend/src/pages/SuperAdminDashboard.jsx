@@ -17,6 +17,7 @@ import { fetchTodasLasFilas } from '../utils/descargaCompleta'
 import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { BotonExcel, TarjetaKpi, CLASE_TABLA_ENCABEZADO } from '../components/ui/ToolbarButtons'
+import { FilaCargando } from '../components/ui/FilaCargando'
 
 const DEFAULT_USER_FORM = {
   id_trabajador: '',
@@ -466,7 +467,7 @@ export function SuperAdminDashboard({ user }) {
     },
     {
       label: 'Permiso móvil',
-      value: mobilePermitePapeleta === null ? '...' : mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO',
+      value: mobilePermitePapeleta === null ? '—' : mobilePermitePapeleta ? 'ACTIVO' : 'INACTIVO',
       detail: mobilePermitePapeleta === null ? 'Cargando configuración...' : mobilePermitePapeleta ? 'Móvil aplica papeletas' : 'Solo reportes/evidencias',
       icon: 'deviceMobile',
       borderColor: 'border-violet-400', textColor: 'text-violet-600 dark:text-violet-400', tone: 'text-violet-600 dark:text-violet-400',
@@ -620,8 +621,8 @@ export function SuperAdminDashboard({ user }) {
               <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] sm:flex-row sm:items-center sm:justify-between">
                 <div className="relative flex-1">
                   <Icon
-                    name={loadingAudit ? 'refresh' : 'search'}
-                    className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${loadingAudit ? 'animate-spin text-indigo-500' : 'text-slate-400'}`}
+                    name="search"
+                    className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
                   />
                   <input
                     type="text"
@@ -699,12 +700,7 @@ export function SuperAdminDashboard({ user }) {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[var(--border)]">
                     {loadingAudit && realAuditLogs.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-10 text-center text-sm font-bold text-slate-500">
-                          <Icon name="refresh" className="mx-auto mb-2 size-7 animate-spin text-slate-300" />
-                          Cargando eventos de auditoría...
-                        </td>
-                      </tr>
+                      <FilaCargando colSpan={7} />
                     ) : realAuditLogs.length ? realAuditLogs.map((event) => (
                       <tr key={event.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-[var(--bg-subtle)]">
                         <td className="px-4 py-3 text-center align-top">
@@ -736,7 +732,7 @@ export function SuperAdminDashboard({ user }) {
                         <td className="px-4 py-3 align-top">
                           <p className="text-xs font-semibold leading-snug text-slate-800 dark:text-white">{event.descripcion}</p>
                           {event.user_agent && (
-                            <p className="mt-0.5 line-clamp-1 text-[10px] text-slate-400" title={event.user_agent}>
+                            <p className="mt-0.5 text-[10px] text-slate-400" title={event.user_agent}>
                               {event.user_agent}
                             </p>
                           )}

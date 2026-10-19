@@ -132,10 +132,10 @@ export function MetricCards({ cards = [], loading = false, user }) {
 
   const displayCards = loading
     ? [
-        { label: 'Recaudación Anual', value: '...', detail: 'Cargando', change: '' },
-        { label: 'Vehículos Registrados', value: '...', detail: 'Cargando', change: '' },
-        { label: 'Documentos Activos', value: '...', detail: 'Cargando', change: '' },
-        { label: 'Papeletas Pendientes', value: '...', detail: 'Cargando', change: '' },
+        { label: 'Recaudación Anual', value: '—', detail: 'Cargando', change: '' },
+        { label: 'Vehículos Registrados', value: '—', detail: 'Cargando', change: '' },
+        { label: 'Documentos Activos', value: '—', detail: 'Cargando', change: '' },
+        { label: 'Papeletas Pendientes', value: '—', detail: 'Cargando', change: '' },
       ]
     : cards
 
@@ -176,7 +176,7 @@ export function MetricCards({ cards = [], loading = false, user }) {
                   {visible}
                 </h3>
                 <div className="flex items-center gap-1 min-w-0">
-                  <span className={`flex items-center truncate text-[12px] font-bold ${style.arrowColor}`}>
+                  <span className={`flex items-center min-w-0 break-words text-[12px] font-bold ${style.arrowColor}`}>
                     <svg className="w-3 h-3 mr-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d={style.arrowIcon}></path></svg>
                     {card.detail}
                   </span>

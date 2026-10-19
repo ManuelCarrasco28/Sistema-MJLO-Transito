@@ -101,20 +101,31 @@ export function CentroImpresion() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {PESTANAS.map((t, i) => (
-          <div key={t.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]">
-            <div className="flex items-start justify-between gap-2">
-              <p className={`text-[10px] font-bold uppercase tracking-wide ${['text-indigo-600 dark:text-indigo-400', 'text-amber-600 dark:text-amber-400', 'text-cyan-600 dark:text-cyan-400'][i]}`}>
-                {['Carnets del curso', 'Tarjetas de operatividad', 'Vehículos para QR'][i]}
-              </p>
-              <span className={`grid size-6 shrink-0 place-items-center rounded-md ${['text-indigo-600 dark:text-indigo-400', 'text-amber-600 dark:text-amber-400', 'text-cyan-600 dark:text-cyan-400'][i]}`}>
-                <Icon name={t.icono} className="size-4" />
-              </span>
+      <div className="kpi-grid">
+        {PESTANAS.map((t, i) => {
+          const color = [
+            { borde: 'border-indigo-400', texto: 'text-indigo-600 dark:text-indigo-400' },
+            { borde: 'border-amber-400', texto: 'text-amber-600 dark:text-amber-400' },
+            { borde: 'border-cyan-400', texto: 'text-cyan-600 dark:text-cyan-400' },
+          ][i]
+          return (
+            <div key={t.id} className={`relative overflow-hidden rounded-xl border-[1.5px] ${color.borde} bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438]`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${color.texto}`}>
+                  {['Carnets del curso', 'Tarjetas de operatividad', 'Vehículos para QR'][i]}
+                </span>
+                <span className={`grid size-6 place-items-center rounded-md ${color.texto}`}>
+                  <Icon name={t.icono} className="size-3.5" />
+                </span>
+              </div>
+              <div className="mt-1">
+                <p className="text-xl font-black leading-tight text-slate-800 dark:text-white sm:text-2xl">
+                  {resumen[t.id] == null ? '—' : resumen[t.id].toLocaleString('es-PE')}
+                </p>
+              </div>
             </div>
-            <p className="shrink-0 text-xl font-black leading-none text-slate-900 dark:text-white">{resumen[t.id] == null ? '—' : resumen[t.id].toLocaleString('es-PE')}</p>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 dark:border-[var(--border)]">

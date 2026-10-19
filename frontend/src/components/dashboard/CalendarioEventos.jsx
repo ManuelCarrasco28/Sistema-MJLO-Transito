@@ -246,7 +246,7 @@ export function CalendarioEventos({ grande = false, onAmpliar, alNavegar }) {
                       <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-1.5 py-0.5 text-[9.5px] font-black text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                         OPERATIVO
                       </span>
-                      <h5 className="mt-1 text-xs font-extrabold text-slate-800 dark:text-white line-clamp-1">
+                      <h5 className="mt-1 text-xs font-extrabold text-slate-800 dark:text-white">
                         {op.nombre || 'Operativo Inopinado'}
                       </h5>
                       <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
@@ -280,7 +280,7 @@ export function CalendarioEventos({ grande = false, onAmpliar, alNavegar }) {
                       <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[9.5px] font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                         CURSO SEGURIDAD VIAL
                       </span>
-                      <h5 className="mt-1 text-xs font-extrabold text-slate-800 dark:text-white line-clamp-1">
+                      <h5 className="mt-1 text-xs font-extrabold text-slate-800 dark:text-white">
                         {c.titulo || c.nombre || 'Capacitación Vial'}
                       </h5>
                       <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">

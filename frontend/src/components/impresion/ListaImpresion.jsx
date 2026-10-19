@@ -10,6 +10,7 @@ import { showConfirm, showError, showToast } from '../../utils/SwalUtil'
 import { fetchTodasLasFilas } from '../../utils/descargaCompleta'
 import { abrirImpresionCuandoEsteListo } from '../../utils/impresionCarnets'
 import '../vehiculos/QrVehiculoImpresion.css'
+import { FilaCargando } from '../ui/FilaCargando'
 
 const COLOR_PRIMARIO = 'oklch(62.3% 0.214 259.815)'
 
@@ -157,7 +158,7 @@ function CarritoImpresionModal({ titulo, nombreItem, items, columnas, onQuitar, 
                         >
                           <span className="min-w-0">
                             <strong className="block font-bold text-slate-800 dark:text-slate-100">Lote {i + 1}</strong>
-                            <span className="block truncate text-[11px] text-slate-500">
+                            <span className="block min-w-0 break-words text-[11px] text-slate-500">
                               {desde}–{desde + lote.length - 1} · {plural(hojasDe(lote.length), 'hoja', 'hojas')}
                             </span>
                           </span>
@@ -478,8 +479,8 @@ export function ListaImpresion({
       <div className="flex flex-col gap-2.5 border-b border-slate-100 px-4 py-2.5 dark:border-[var(--border)] lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1">
           <Icon
-            name={cargando ? 'refresh' : 'search'}
-            className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors ${cargando ? 'animate-spin text-blue-500' : 'text-slate-400'}`}
+            name="search"
+            className={`absolute left-3 top-1/2 size-3.5 -translate-y-1/2 transition-colors text-slate-400`}
           />
           <input
             type="text"
@@ -583,14 +584,7 @@ export function ListaImpresion({
           </thead>
           <tbody className={`divide-y divide-slate-100 transition-opacity duration-150 dark:divide-[var(--border)] ${cargando && filas.length > 0 ? 'pointer-events-none opacity-60' : 'opacity-100'}`}>
             {cargando && filas.length === 0 ? (
-              Array.from({ length: 5 }).map((_, idx) => (
-                <tr key={idx} className="animate-pulse">
-                  {columnas.map((c) => (
-                    <td key={c.titulo} className="px-3.5 py-3"><div className="h-4 w-28 rounded bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                  ))}
-                  <td className="sticky right-0 z-10 border-l border-slate-200 bg-white px-4 py-4 shadow-[-4px_0_8px_rgba(0,0,0,0.04)] dark:border-[var(--border)] dark:bg-[#1C2438]"><div className="mx-auto h-7 w-20 rounded-lg bg-slate-200 dark:bg-[var(--bg-subtle)]" /></td>
-                </tr>
-              ))
+              <FilaCargando colSpan={2} />
             ) : filas.length === 0 ? (
               <tr>
                 <td colSpan={columnas.length + 1} className="p-12 text-center">

@@ -64,7 +64,7 @@ export function FiltroRemoto({ value, onChange, endpoint, etiquetaTodos, etiquet
           abierto ? 'border-indigo-500 ring-2 ring-indigo-500/20 dark:border-indigo-400' : 'border-slate-200 hover:border-slate-300 dark:border-[var(--border-strong)] dark:hover:border-slate-600'
         }`}
       >
-        <span className="truncate">{etiqueta}</span>
+        <span className="min-w-0 break-words">{etiqueta}</span>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`size-3.5 shrink-0 text-slate-400 transition-transform duration-150 ${abierto ? 'rotate-180 text-indigo-500 dark:text-indigo-400' : ''}`}>
           <polyline points="6 9 12 15 18 9" />
         </svg>

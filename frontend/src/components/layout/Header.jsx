@@ -377,7 +377,7 @@ export function Header({
             <div className="absolute right-0 top-full mt-3 z-50 w-56 rounded-2xl border border-slate-200 dark:border-[var(--border-strong)] bg-white dark:bg-[#1C2438] p-2 shadow-[0_20px_45px_rgba(112,144,176,0.20)] dark:shadow-none animate-enter">
               <div className="border-b border-slate-100 dark:border-[var(--border-strong)] px-3 py-2.5">
                 <p className="text-sm font-bold text-slate-800 dark:text-white">{userFullName}</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{userEmail}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 min-w-0 break-words">{userEmail}</p>
                 <span className="mt-1.5 inline-block rounded-md bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-[#5B6EE1] dark:text-blue-300">
                   {userRole}
                 </span>
