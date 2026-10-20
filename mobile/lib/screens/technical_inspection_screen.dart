@@ -308,10 +308,10 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
           children: [
             Icon(_esEdicion ? Icons.edit_note_rounded : Icons.assignment_turned_in, color: AppTheme.primaryBlue),
             const SizedBox(width: 8),
-            Text(
+            Flexible(child: Text(
               _esEdicion ? 'Modificar Inspección' : 'Enviar Inspección',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-            ),
+            )),
           ],
         ),
         content: Column(

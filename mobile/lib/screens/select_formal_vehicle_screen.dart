@@ -389,14 +389,14 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
                                         child: const Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
-                                            Text(
+                                            Flexible(child: Text(
                                               'Iniciar Inspección Técnica',
                                               style: TextStyle(
                                                 color: AppTheme.primaryBlue,
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 12,
                                               ),
-                                            ),
+                                            )),
                                             SizedBox(width: 4),
                                             Icon(Icons.arrow_forward, size: 14, color: AppTheme.primaryBlue),
                                           ],

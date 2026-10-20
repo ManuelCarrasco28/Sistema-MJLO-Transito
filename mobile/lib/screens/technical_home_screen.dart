@@ -190,12 +190,12 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                                 Container(
                                   width: 44,
                                   height: 44,
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryBlue,
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+                                  child: Image.asset('assets/images/app_icon.png', fit: BoxFit.contain),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
@@ -411,7 +411,7 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Flexible(child: const Text(
                     'HISTORIAL DE INSPECCIONES',
                     style: TextStyle(
                       fontSize: 12,
@@ -419,7 +419,7 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                       color: Color(0xFF475569),
                       letterSpacing: 0.5,
                     ),
-                  ),
+                  )),
                   Text(
                     '${_inspecciones.length} registros',
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
@@ -581,10 +581,10 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
+                                        Flexible(child: Text(
                                           'Reg: $registro · $fecha',
                                           style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.grey.shade500),
-                                        ),
+                                        )),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                           decoration: BoxDecoration(

@@ -612,10 +612,10 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                     children: [
                       Icon(Icons.access_time, size: 16, color: Colors.grey.shade700),
                       const SizedBox(width: 6),
-                      Text(
+                      Flexible(child: Text(
                         'Horario programado: $horaInicio a $horaFin',
                         style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-                      ),
+                      )),
                     ],
                   ),
                   if (fueCancelado) ...[
@@ -860,10 +860,10 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
                             children: [
                               const Icon(Icons.payments_outlined, size: 14, color: Color(0xFF64748B)),
                               const SizedBox(width: 6),
-                              Text(
+                              Flexible(child: Text(
                                 'Monto: S/ ${data['montoTotal']}',
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                              ),
+                              )),
                             ],
                           ),
                         ],

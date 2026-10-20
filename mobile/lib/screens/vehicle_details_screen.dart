@@ -231,14 +231,14 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                           color: AppTheme.primaryBlue,
                         ),
                         const SizedBox(width: 6),
-                        Text(
+                        Flexible(child: Text(
                           'Sede consultada: ${widget.sedeNombre ?? 'CHICLAYO'}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryBlue,
                           ),
-                        ),
+                        )),
                       ],
                     ),
                   ),
@@ -284,7 +284,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                       const SizedBox(height: 8),
                       _buildErrorTip(
                         Icons.fact_check_outlined,
-                        'Si la unidad no cuenta con placa o está ilegible, use la opción "Registrar Veh./Pers. sin ident.".',
+                        'Si la unidad no cuenta con placa o está ilegible, use la opción "Registrar sin identificar".',
                       ),
                     ],
                   ),

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../theme.dart';
+import '../utils/animaciones.dart';
 import 'qr_scanner_screen.dart';
 import 'register_vehicle_screen.dart';
 import 'history_screen.dart';
@@ -219,7 +220,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       context: parentContext,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (builderCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Text(
             title,
             style: const TextStyle(
@@ -310,7 +313,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     _loadDashboardData();
                     if (result is Map && result['reintentar'] == true) {
                       OficinaRegistral oficinaReintento = selectedOficina;
-                      if (result['codeZona'] != null && result['codeOficina'] != null) {
+                      if (result['codeZona'] != null &&
+                          result['codeOficina'] != null) {
                         try {
                           oficinaReintento = kOficinasRegistrales.firstWhere(
                             (o) =>
@@ -339,13 +343,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   });
                 }
               },
-            child: const Text(
-              'Buscar',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              child: const Text(
+                'Buscar',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -366,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSummaryCards(),
+                    AparicionEscalonada(child: _buildSummaryCards()),
                     const SizedBox(height: 24),
                     const Text(
                       'Acciones de Control',
@@ -621,15 +625,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: AppTheme.accentYellow,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person_outline,
+            width: 44,
+            height: 44,
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
               color: AppTheme.primaryBlue,
-              size: 28,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              fit: BoxFit.contain,
             ),
           ),
           const SizedBox(width: 12),
@@ -661,8 +666,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       cargo.isNotEmpty
                           ? cargo
                           : (_operativoActivo != null
-                              ? 'Operativo: ${_operativoActivo!['nombre']}'
-                              : 'Sin operativo asignado'),
+                                ? 'Operativo: ${_operativoActivo!['nombre']}'
+                                : 'Sin operativo asignado'),
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.85),
                         fontSize: 11,
@@ -682,7 +687,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const InspectorProfileScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const InspectorProfileScreen(),
+                ),
               );
             },
           ),
@@ -724,9 +731,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(
-                      '$_registradasHoy',
-                      style: const TextStyle(
+                    NumeroAnimado(
+                      valor: _registradasHoy,
+                      estilo: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                         color: AppTheme.primaryBlue,
@@ -768,9 +775,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Text(
-                      '$_reportesHoy',
-                      style: const TextStyle(
+                    NumeroAnimado(
+                      valor: _reportesHoy,
+                      estilo: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                         color: Colors.orange,
@@ -807,62 +814,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 0.9,
-      children: [
-        _buildActionCard(
-          title: 'Consultar Veh. / Persona',
-          subtitle: permitePapeleta
-              ? 'Buscar y generar\ninfracciones.'
-              : 'Buscar y enviar\nreportes.',
-          icon: permitePapeleta ? Icons.edit_document : Icons.camera_alt,
-          isPrimary: true,
-          onTap: () => _handlePrimaryControlAction(),
-        ),
-        _buildActionCard(
-          title: 'Escáner',
-          subtitle: 'Escaneo de código QR en\nDocumento o placas.',
-          icon: Icons.qr_code_scanner,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-            );
-          },
-        ),
-        _buildActionCard(
-          title: 'Registrar Veh./Pers. sin ident.',
-          subtitle: permitePapeleta
-              ? 'Registrar vehículo o persona sin placa/doc y generar infracción.'
-              : 'Registrar vehículo o persona sin placa/doc y generar reporte.',
-          icon: Icons.motorcycle,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const RegisterVehicleScreen()),
-            );
-          },
-        ),
-        _buildActionCard(
-          title: 'Mi Historial',
-          subtitle: 'Ver mis papeletas registradas.',
-          icon: Icons.history,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HistoryScreen()),
-            ).then((_) {
-              // Recargar conteos del dashboard al volver del historial
-              if (mounted) _loadDashboardData();
-            });
-          },
-        ),
-      ],
+    // Alto de tarjeta: parte de la proporción 0.9 y crece con la letra del sistema, para que el texto no se corte.
+    final escalaTexto = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final anchoTarjeta = (constraints.maxWidth - 16) / 2;
+        final altoTarjeta = anchoTarjeta / 0.9 * (1 + (escalaTexto - 1) * 0.6);
+        return GridView(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            mainAxisExtent: altoTarjeta,
+          ),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildActionCard(
+              title: 'Consultar vehículo o persona',
+              indice: 1,
+              subtitle: permitePapeleta
+                  ? 'Busca y genera infracciones.'
+                  : 'Busca y envía reportes.',
+              icon: permitePapeleta ? Icons.edit_document : Icons.camera_alt,
+              isPrimary: true,
+              onTap: () => _handlePrimaryControlAction(),
+            ),
+            _buildActionCard(
+              title: 'Escáner',
+              indice: 2,
+              subtitle: 'Escanea el QR de un documento o una placa.',
+              icon: Icons.qr_code_scanner,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+                );
+              },
+            ),
+            _buildActionCard(
+              title: 'Registrar sin identificar',
+              indice: 3,
+              subtitle: permitePapeleta
+                  ? 'Vehículo o persona sin placa ni documento.'
+                  : 'Vehículo o persona sin placa ni documento.',
+              icon: Icons.motorcycle,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RegisterVehicleScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildActionCard(
+              title: 'Mi Historial',
+              indice: 4,
+              subtitle: 'Tus papeletas registradas.',
+              icon: Icons.history,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                ).then((_) {
+                  // Recargar conteos del dashboard al volver del historial
+                  if (mounted) _loadDashboardData();
+                });
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -875,6 +898,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Color? badgeColor,
     Color? badgeTextColor,
     required VoidCallback onTap,
+    int indice = 0,
   }) {
     final bgColor = isPrimary ? AppTheme.primaryBlue : Colors.white;
     final textColor = isPrimary ? Colors.white : AppTheme.primaryBlue;
@@ -883,79 +907,86 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         : AppTheme.backgroundLight;
     final iconColor = AppTheme.primaryBlue;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: bgColor,
+    return AparicionEscalonada(
+      indice: indice,
+      child: PulsarAlTocar(
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          border: isPrimary ? null : Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            if (isPrimary)
-              BoxShadow(
-                color: AppTheme.primaryBlue.withOpacity(0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: iconBgColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: iconColor),
-                ),
-                if (badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badgeColor ?? Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      badge,
-                      style: TextStyle(
-                        color: badgeTextColor ?? Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(20),
+              border: isPrimary
+                  ? null
+                  : Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                if (isPrimary)
+                  BoxShadow(
+                    color: AppTheme.primaryBlue.withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
                   ),
               ],
             ),
-            const Spacer(),
-            Text(
-              title,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: iconBgColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: iconColor),
+                    ),
+                    if (badge != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor ?? Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            color: badgeTextColor ?? Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: isPrimary ? Colors.white70 : Colors.grey.shade600,
+                    fontSize: 11,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isPrimary ? Colors.white70 : Colors.grey.shade600,
-                fontSize: 11,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+          ),
         ),
       ),
     );
