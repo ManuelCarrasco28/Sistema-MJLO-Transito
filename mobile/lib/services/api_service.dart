@@ -51,7 +51,7 @@ class ApiService {
   // Configuración de URL del Backend:
   // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
   // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://10.225.254.109:8080/api'; // Conexión local a Docker / IP de red local
+  static const String _defaultUrl = 'http://10.237.155.109:8080/api'; // Conexión local a Docker / IP de red local
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -762,7 +762,7 @@ class ApiService {
     return [];
   }
 
-  /// Registra la inspección técnica en estado PENDIENTE_REVISION
+  /// Registra la inspección técnica aprobada directamente en estado oficial ACTIVO
   static Future<Map<String, dynamic>> enviarInspeccionTecnica(
     Map<String, dynamic> data,
   ) async {
@@ -803,6 +803,50 @@ class ApiService {
     }
 
     throw Exception(_extractError(response.body, 'No se pudo modificar la inspección técnica.'));
+  }
+
+  /// Modifica una papeleta (infracción) dentro de la tolerancia de 5 minutos
+  static Future<Map<String, dynamic>> modificarPapeleta(
+    int papeletaId,
+    Map<String, dynamic> data,
+  ) async {
+    final uri = Uri.parse('$baseUrl/mobile/papeletas/$papeletaId');
+    final response = await _send(
+      () async => _http.put(
+        uri,
+        headers: await _getHeaders(isJson: true),
+        body: jsonEncode(data),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return json;
+    }
+
+    throw Exception(_extractError(response.body, 'No se pudo modificar la papeleta.'));
+  }
+
+  /// Modifica un reporte de intervención dentro de la tolerancia de 5 minutos
+  static Future<Map<String, dynamic>> modificarReporte(
+    int reporteId,
+    Map<String, dynamic> data,
+  ) async {
+    final uri = Uri.parse('$baseUrl/mobile/reportes-intervencion/$reporteId');
+    final response = await _send(
+      () async => _http.put(
+        uri,
+        headers: await _getHeaders(isJson: true),
+        body: jsonEncode(data),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return json;
+    }
+
+    throw Exception(_extractError(response.body, 'No se pudo modificar el reporte.'));
   }
 
   /// Obtiene el historial de inspecciones del inspector técnico

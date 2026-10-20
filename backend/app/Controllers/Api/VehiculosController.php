@@ -106,8 +106,12 @@ class VehiculosController extends ResourceController
                 ->getResultArray();
 
             foreach ($documentos as $doc) {
-                if (in_array($doc['estado'], ['VIGENTE', 'VENCIDO'], true) && !empty($doc['fechaExpiracion'])) {
-                    $doc['estado'] = $doc['fechaExpiracion'] < \App\Libraries\ReglasCurso::hoy() ? 'VENCIDO' : 'VIGENTE';
+                if (!empty($doc['fechaExpiracion'])) {
+                    if ($doc['fechaExpiracion'] < \App\Libraries\ReglasCurso::hoy()) {
+                        $doc['estado'] = 'VENCIDO';
+                    } elseif (in_array($doc['estado'], ['VENCIDO', 'APROBADO'], true)) {
+                        $doc['estado'] = 'VIGENTE';
+                    }
                 }
                 $vehiculoId = (int)$doc['id_vehiculo'];
                 unset($doc['id_vehiculo']);

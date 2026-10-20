@@ -20,11 +20,11 @@ class InspeccionesController extends ResourceController
         $row = $db->table('certicav')
             ->select("
                 COUNT(*) as total,
-                SUM(CASE WHEN resultado = 'APROBADO' AND estado != 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as aprobados,
-                SUM(CASE WHEN resultado = 'OBSERVADO' AND estado != 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as observados,
-                SUM(CASE WHEN resultado = 'DESAPROBADO' AND estado != 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as desaprobados,
-                SUM(CASE WHEN estado = 'PENDIENTE_REVISION' THEN 1 ELSE 0 END) as pendientes_revision
+                SUM(CASE WHEN resultado = 'APROBADO' AND estado != 'ANULADA' THEN 1 ELSE 0 END) as aprobados,
+                SUM(CASE WHEN resultado = 'OBSERVADO' AND estado != 'ANULADA' THEN 1 ELSE 0 END) as observados,
+                SUM(CASE WHEN resultado = 'DESAPROBADO' AND estado != 'ANULADA' THEN 1 ELSE 0 END) as desaprobados
             ", false)
+            ->where('estado !=', 'ANULADA')
             ->get()->getRowArray();
 
         return $this->respond(['data' => [
@@ -32,7 +32,6 @@ class InspeccionesController extends ResourceController
             'aprobados' => (int) ($row['aprobados'] ?? 0),
             'observados' => (int) ($row['observados'] ?? 0),
             'desaprobados' => (int) ($row['desaprobados'] ?? 0),
-            'pendientes_revision' => (int) ($row['pendientes_revision'] ?? 0),
         ]]);
     }
 
@@ -763,7 +762,7 @@ class InspeccionesController extends ResourceController
                 i.fecha_modificacion as fechaModificacion,
                 TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW()) as segundosDesdeCreacion,
                 GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW())) as segundosRestantesTolerancia,
-                CASE WHEN i.estado = 'PENDIENTE_REVISION' AND TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar
+                CASE WHEN i.estado != 'ANULADA' AND TIMESTAMPDIFF(SECOND, i.fecha_modificacion, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar
             ")
             ->join('vehiculos v', 'v.id = i.id_vehiculo', 'left')
             ->join('asociaciones a', 'a.id = v.id_asociacion', 'left')
@@ -798,8 +797,6 @@ class InspeccionesController extends ResourceController
 
         if (($row['estado'] ?? '') === 'ANULADA') {
             $row['estadoVigencia'] = 'ANULADA';
-        } elseif (($row['estado'] ?? '') === 'PENDIENTE_REVISION') {
-            $row['estadoVigencia'] = 'PENDIENTE_REVISION';
         } elseif ($row['resultado'] === 'APROBADO') {
             $row['estadoVigencia'] = $hoy <= $fechaVencimiento ? 'VIGENTE' : 'VENCIDO';
             $row['diasRestantes'] = max(0, (int)((strtotime($fechaVencimiento) - strtotime($hoy)) / 86400));
@@ -1007,7 +1004,7 @@ class InspeccionesController extends ResourceController
                 'fecha'                 => $fecha,
                 'resultado'             => $resultado,
                 'observaciones'         => $observaciones,
-                'estado'                => 'PENDIENTE_REVISION',
+                'estado'                => 'ACTIVO',
             ];
 
             $db->table('certicav')->insert($inspData);
@@ -1035,13 +1032,13 @@ class InspeccionesController extends ResourceController
             \App\Services\AuditoriaService::registrar(
                 'INSPECCION_TECNICA',
                 'REGISTRO_MOVIL',
-                "El inspector técnico {$tecnicoNombre} registró la inspección de campo para el vehículo {$placa} (Registro: {$numeroInspeccion}). Enviada a revisión del Administrador.",
+                "El inspector técnico {$tecnicoNombre} registró la inspección de campo para el vehículo {$placa} (Registro: {$numeroInspeccion}).",
                 ['id' => $inspeccionId, 'placa' => $placa, 'registro' => $numeroInspeccion, 'resultado' => $resultado]
             );
 
             return $this->respondCreated([
                 'status'  => true,
-                'message' => 'Inspección técnica enviada con éxito en estado pendiente de revisión para la aprobación del Administrador.',
+                'message' => 'Inspección técnica registrada y aprobada exitosamente.',
                 'data'    => [
                     'id'                  => $inspeccionId,
                     'numeroRegistro'      => $numeroInspeccion,
@@ -1050,7 +1047,7 @@ class InspeccionesController extends ResourceController
                     'fecha'               => $fecha,
                     'resultado'           => $resultado,
                     'primeraEvaluacion'   => $primeraEvaluacion,
-                    'estado'              => 'PENDIENTE_REVISION',
+                    'estado'              => 'ACTIVO',
                     'inspector'           => $tecnicoNombre,
                 ],
             ]);
@@ -1085,8 +1082,8 @@ class InspeccionesController extends ResourceController
             return $this->failNotFound('Inspección no encontrada.');
         }
 
-        if ($row['estado'] !== 'PENDIENTE_REVISION') {
-            return $this->failValidationErrors('La inspección ya no puede modificarse porque ha sido aprobada u oficializada.');
+        if ($row['estado'] === 'ANULADA') {
+            return $this->failValidationErrors('La inspección se encuentra anulada.');
         }
 
         if ($tecnicoPersonaId > 0 && !empty($row['id_tecnico']) && (int)$row['id_tecnico'] !== $tecnicoPersonaId) {
@@ -1222,7 +1219,7 @@ class InspeccionesController extends ResourceController
         return $this->respond(['status' => true, 'data' => $data]);
     }
 
-    public function aprobar($id = null)
+    public function pdf($id = null)
     {
         $db = \Config\Database::connect();
         $id = (int)$id;
@@ -1230,48 +1227,576 @@ class InspeccionesController extends ResourceController
             return $this->failNotFound('ID de inspección no válido.');
         }
 
-        $row = $db->table('certicav')->where('id', $id)->get()->getRowArray();
+        $row = $this->consultaInspeccion($db)
+            ->where('i.id', $id)
+            ->get()
+            ->getRowArray();
+
         if (!$row) {
-            return $this->failNotFound('Inspección no encontrada.');
+            return $this->failNotFound('Inspección técnica no encontrada.');
         }
 
-        if ($row['estado'] === 'ACTIVO') {
-            return $this->respond(['status' => true, 'message' => 'La inspección ya se encuentra aprobada y activa.']);
+        $row = $this->aplicarVigencia($row);
+
+        $detalles = $this->consultaDetalles($db)
+            ->where('d.id_certicav', $id)
+            ->get()
+            ->getResultArray();
+
+        $evaluaciones = [];
+        foreach ($detalles as $det) {
+            if (!empty($det['codigo'])) {
+                $evaluaciones[$det['codigo']] = $det['estado'];
+            }
+            if (!empty($det['criterioId'])) {
+                $evaluaciones[(int)$det['criterioId']] = $det['estado'];
+            }
         }
 
-        $vehiculoId = (int)$row['id_vehiculo'];
-        $idPago = $row['id_pago'];
+        $html = $this->construirCerticavHtml($row, $evaluaciones);
 
-        if (empty($idPago)) {
-            try {
-                $certicavPago = new \App\Services\CerticavPago($db);
-                $pagoDisp = $certicavPago->pagoDisponible($vehiculoId);
-                if ($pagoDisp) {
-                    $idPago = (int)$pagoDisp['id'];
-                }
-            } catch (\Throwable $e) {}
-        }
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('defaultFont', 'DejaVu Sans');
 
-        $updateData = [
-            'estado' => 'ACTIVO',
-        ];
-        if (!empty($idPago)) {
-            $updateData['id_pago'] = $idPago;
-        }
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->loadHtml($html);
+        $dompdf->render();
 
-        $db->table('certicav')->where('id', $id)->update($updateData);
+        $numeroReg = !empty($row['numeroRegistro']) ? $row['numeroRegistro'] : "INSP-{$id}";
+        $filename = "CERTICAV-{$numeroReg}.pdf";
 
         \App\Services\AuditoriaService::registrar(
             'INSPECCION_TECNICA',
-            'APROBACION_ADMIN',
-            "El administrador aprobó la inspección técnica ID {$id} (Registro: {$row['numero_registro']}), pasando de PENDIENTE_REVISION a ACTIVO.",
-            ['id' => $id, 'numero_registro' => $row['numero_registro'], 'estado' => 'ACTIVO']
+            'DESCARGAR_PDF',
+            "Descarga de ficha CERTICAV oficial en PDF (Registro: {$numeroReg})",
+            ['id' => $id, 'registro' => $numeroReg]
         );
 
-        return $this->respond([
-            'status'  => true,
-            'message' => 'Inspección técnica aprobada y oficializada con éxito.',
-            'data'    => array_merge($row, $updateData),
-        ]);
+        return $this->response
+            ->setHeader('Content-Type', 'application/pdf')
+            ->setHeader('Content-Disposition', 'inline; filename="' . $filename . '"')
+            ->setBody($dompdf->output());
+    }
+
+    private function construirCerticavHtml(array $data, array $evaluaciones): string
+    {
+        $escudoPath = FCPATH . 'escudo-jlo.png';
+        if (!file_exists($escudoPath)) {
+            $escudoPath = dirname(FCPATH) . '/frontend/public/escudo-jlo.png';
+        }
+        $escudoBase64 = file_exists($escudoPath)
+            ? 'data:image/png;base64,' . base64_encode(file_get_contents($escudoPath))
+            : '';
+
+        $qrUrl = "https://munijlo.gob.pe/transito/validar?tipo=CERTICAV&reg=" . urlencode((string)($data['numeroRegistro'] ?? '')) . "&placa=" . urlencode((string)($data['vehiculoPlaca'] ?? ''));
+        try {
+            $qrBase64 = (new \chillerlan\QRCode\QRCode())->render($qrUrl);
+        } catch (\Throwable $e) {
+            $qrBase64 = '';
+        }
+
+        $fechaRaw = $data['fecha'] ?: date('Y-m-d');
+        $partes = explode('-', (string)explode(' ', $fechaRaw)[0]);
+        $dia = $partes[2] ?? date('d');
+        $mes = $partes[1] ?? date('m');
+        $anio = isset($partes[0]) ? substr($partes[0], -2) : date('y');
+
+        $serieRaw = preg_replace('/\D/', '', (string)($data['numeroSerieCerticav'] ?? ''));
+        $serieSello = $serieRaw !== '' ? str_pad(substr($serieRaw, -7), 7, '0', STR_PAD_LEFT) : '0000000';
+
+        $primeraEval = $data['primeraEvaluacion'] ?? ($data['resultado'] ?? 'APROBADO');
+        $isPrimeraAprobado = $primeraEval === 'APROBADO';
+        $isPrimeraDesaprobado = $primeraEval === 'DESAPROBADO';
+
+        $segundaEval = $data['segundaEvaluacion'] ?? '';
+        $isSegundaAprobado = $segundaEval === 'APROBADO';
+        $isSegundaDesaprobado = $segundaEval === 'DESAPROBADO';
+
+        $columnaIzquierda = [
+            ['tipo' => 'header', 'titulo' => 'SISTEMA ELECTRICO'],
+            ['id' => 1, 'label' => 'Encendido de máquina'],
+            ['id' => 2, 'label' => 'Velocímetro'],
+            ['id' => 3, 'label' => 'Sonido de Claxón'],
+            ['id' => 4, 'label' => '- Lado delantero derecho', 'isChild' => true],
+            ['id' => 5, 'label' => '- Lado delantero izquierdo', 'isChild' => true],
+            ['id' => 6, 'label' => '- Lado posterior derecho', 'isChild' => true],
+            ['id' => 7, 'label' => '- Lado posterior izquierdo', 'isChild' => true],
+            ['id' => 8, 'label' => '- Luz de alta', 'isChild' => true],
+            ['id' => 9, 'label' => '- Luz de baja', 'isChild' => true],
+            ['id' => 10, 'label' => '- Lado delantero derecho', 'isChild' => true],
+            ['id' => 11, 'label' => '- Lado delantero izquierdo', 'isChild' => true],
+            ['id' => 12, 'label' => '- Lado posterior derecho', 'isChild' => true],
+            ['id' => 13, 'label' => '- Lado posterior izquierdo', 'isChild' => true],
+            ['id' => 14, 'label' => '- Lado delantero derecho', 'isChild' => true],
+            ['id' => 15, 'label' => '- Lado delantero izquierdo', 'isChild' => true],
+            ['id' => 16, 'label' => '- Lado posterior derecho', 'isChild' => true],
+            ['id' => 17, 'label' => '- Lado posterior izquierdo', 'isChild' => true],
+            ['tipo' => 'header', 'titulo' => 'ASPECTOS INTERIORES'],
+            ['id' => 18, 'label' => 'Tapiz del asiento'],
+        ];
+
+        $columnaDerecha = [
+            ['tipo' => 'header', 'titulo' => 'ESPECIFICACIONES MECÁNICAS'],
+            ['id' => 19, 'label' => 'Tubo de escape'],
+            ['id' => 20, 'label' => 'Acelerador'],
+            ['id' => 21, 'label' => 'Embrague'],
+            ['id' => 22, 'label' => 'Tapa de tanque de combustible'],
+            ['id' => 23, 'label' => '- Freno de pedal', 'isChild' => true],
+            ['id' => 24, 'label' => '- Freno de mano auxiliar', 'isChild' => true],
+            ['tipo' => 'header', 'titulo' => 'ASPECTOS EXTERIORES'],
+            ['id' => 25, 'label' => 'Espejos retrovisores'],
+            ['id' => 26, 'label' => 'Parabrisas transparente'],
+            ['id' => 27, 'label' => '- Visibilidad del parabrisas', 'isChild' => true],
+            ['id' => 28, 'label' => 'Micas transparentes'],
+            ['id' => 29, 'label' => 'Placa original del vehículo'],
+            ['id' => 30, 'label' => '- Lado izquierdo', 'isChild' => true],
+            ['id' => 31, 'label' => '- Lado derecho', 'isChild' => true],
+            ['id' => 32, 'label' => '- Lado posterior', 'isChild' => true],
+            ['id' => 33, 'label' => '- Placa lado posterior del vehículo', 'isChild' => true],
+            ['id' => 34, 'label' => '- Placa lado superior techo', 'isChild' => true],
+            ['id' => 35, 'label' => '- Placa lado interior respaldar del conductor', 'isChild' => true],
+            ['id' => 36, 'label' => 'Razón social transportador lado superior techo'],
+            ['id' => 37, 'label' => 'Razón social lado interior'],
+        ];
+
+        $renderTableRows = function (array $items) use ($evaluaciones) {
+            $html = '';
+            foreach ($items as $item) {
+                if (($item['tipo'] ?? '') === 'header') {
+                    $html .= '<tr class="tr-header">
+                        <td class="td-header">' . htmlspecialchars($item['titulo']) . '</td>
+                        <td class="td-col-h">B</td>
+                        <td class="td-col-h">M.E.</td>
+                        <td class="td-col-h">N.T.</td>
+                    </tr>';
+                    continue;
+                }
+                $codigo = isset($item['id']) ? sprintf('CV-%02d', $item['id']) : '';
+                $val = $evaluaciones[$codigo] ?? ($evaluaciones[$item['id'] ?? 0] ?? '');
+                $paddingLeft = !empty($item['isChild']) ? '12px' : '4px';
+
+                $checkB  = ($val === 'BIEN') ? '&#10003;' : '';
+                $checkME = ($val === 'MAL_ESTADO') ? '&#10003;' : '';
+                $checkNT = ($val === 'NO_TIENE') ? '&#10003;' : '';
+
+                $html .= '<tr class="tr-row">
+                    <td class="td-label" style="padding-left: ' . $paddingLeft . ';">' . htmlspecialchars($item['label']) . '</td>
+                    <td class="td-check">' . $checkB . '</td>
+                    <td class="td-check">' . $checkME . '</td>
+                    <td class="td-check">' . $checkNT . '</td>
+                </tr>';
+            }
+            return $html;
+        };
+
+        $rowsIzq = $renderTableRows($columnaIzquierda);
+        $rowsDer = $renderTableRows($columnaDerecha);
+
+        $registro = htmlspecialchars((string)($data['numeroRegistro'] ?? '—'));
+        $marca = htmlspecialchars((string)($data['vehiculoMarca'] ?? ($data['marca'] ?? '—')));
+        $transportador = htmlspecialchars((string)($data['transportador'] ?? ($data['asociacion'] ?? 'INDEPENDIENTE')));
+        $propietario = htmlspecialchars((string)($data['propietario'] ?? '—'));
+        $conductor = htmlspecialchars((string)($data['conductorNombre'] ?? ($data['conductor'] ?? ($data['propietario'] ?: '—'))));
+        $licencia = htmlspecialchars((string)($data['conductorLicencia'] ?? '—'));
+        $placa = htmlspecialchars((string)($data['vehiculoPlaca'] ?? ($data['placa'] ?? '—')));
+        $anioFab = htmlspecialchars((string)($data['vehiculoAnio'] ?? '—'));
+        $modelo = htmlspecialchars((string)($data['vehiculoModelo'] ?? '—'));
+        $motor = htmlspecialchars((string)($data['vehiculoMotor'] ?? '—'));
+        $inspector = htmlspecialchars((string)($data['inspector'] ?? 'Inspector Técnico Municipal'));
+        $dniCond = htmlspecialchars((string)($data['conductorDni'] ?? ($data['propietarioDni'] ?? '—')));
+
+        $checkP1A = $isPrimeraAprobado ? '&#10003;' : '';
+        $checkP1D = $isPrimeraDesaprobado ? '&#10003;' : '';
+        $checkP2A = $isSegundaAprobado ? '&#10003;' : '';
+        $checkP2D = $isSegundaDesaprobado ? '&#10003;' : '';
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+    @page {
+        size: A4 portrait;
+        margin: 8mm 10mm 6mm 10mm;
+    }
+    body {
+        font-family: 'DejaVu Sans', Arial, sans-serif;
+        font-size: 7.2pt;
+        color: #000;
+        margin: 0;
+        padding: 0;
+        line-height: 1.1;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+    .header-table td {
+        vertical-align: middle;
+    }
+    .inst-title {
+        text-align: center;
+    }
+    .inst-title img {
+        height: 58px;
+        margin-bottom: 2px;
+    }
+    .inst-sub1 {
+        font-size: 6.2pt;
+        font-weight: bold;
+        color: #004b93;
+        text-transform: uppercase;
+        margin: 0;
+    }
+    .inst-sub2 {
+        font-size: 7.2pt;
+        font-weight: bold;
+        color: #004b93;
+        text-transform: uppercase;
+        margin: 1px 0 2px 0;
+    }
+    .inst-banner {
+        background-color: #004b93;
+        color: #ffffff;
+        font-weight: bold;
+        font-size: 8.5pt;
+        text-transform: uppercase;
+        padding: 3px 6px;
+        border-radius: 2px;
+        display: inline-block;
+        margin-top: 2px;
+    }
+    .serie-box {
+        text-align: right;
+        font-family: 'Times New Roman', Times, serif;
+        color: #c0392b;
+        font-size: 15pt;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+    .data-card {
+        border: 1.5px solid #000;
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }
+    .data-card td {
+        border: 1px solid #000;
+        padding: 2px 4px;
+        font-size: 7pt;
+    }
+    .lbl {
+        font-size: 5.5pt;
+        font-weight: bold;
+        color: #1e293b;
+        text-transform: uppercase;
+        display: block;
+    }
+    .val {
+        font-size: 7.2pt;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    .val-mono {
+        font-family: monospace;
+        font-size: 8.5pt;
+        font-weight: bold;
+    }
+    .col-table {
+        border: 1.5px solid #000;
+        font-size: 6.8pt;
+    }
+    .tr-header {
+        background-color: #004b93;
+        color: #ffffff;
+        font-weight: bold;
+    }
+    .td-header {
+        padding: 2px 4px;
+        border-right: 1px solid #000;
+        border-bottom: 1px solid #000;
+        font-size: 6.8pt;
+        text-transform: uppercase;
+    }
+    .td-col-h {
+        width: 20px;
+        text-align: center;
+        border-right: 1px solid #000;
+        border-bottom: 1px solid #000;
+        font-size: 6.8pt;
+        font-weight: bold;
+    }
+    .tr-row td {
+        border-bottom: 1px solid #000;
+        height: 14.5px;
+        padding: 0 2px;
+    }
+    .td-label {
+        border-right: 1px solid #000;
+        font-size: 6.5pt;
+        white-space: nowrap;
+    }
+    .td-check {
+        width: 20px;
+        text-align: center;
+        border-right: 1px solid #000;
+        font-weight: bold;
+        font-size: 8pt;
+    }
+    .eval-card {
+        border: 1.5px solid #000;
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }
+    .eval-card td {
+        border: 1px solid #000;
+        padding: 3px 5px;
+        font-size: 6.8pt;
+    }
+    .box-check {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        border: 1px solid #000;
+        text-align: center;
+        line-height: 11px;
+        font-size: 7.5pt;
+        font-weight: bold;
+        vertical-align: middle;
+        margin-left: 2px;
+    }
+    .sig-card {
+        border: 1.5px solid #000;
+        margin-bottom: 5px;
+    }
+    .sig-card td {
+        border: 1px solid #000;
+        padding: 3px 6px;
+        vertical-align: top;
+        height: 48px;
+    }
+    .legal-note {
+        font-size: 5.2pt;
+        line-height: 1.2;
+        text-align: justify;
+    }
+</style>
+</head>
+<body>
+
+<!-- CABECERA -->
+<table class="header-table">
+    <tr>
+        <td style="width: 15%;"></td>
+        <td style="width: 70%;" class="inst-title">
+            <img src="{$escudoBase64}" alt="Municipalidad Distrital José Leonardo Ortiz"><br>
+            <p class="inst-sub1">ORDENANZA MUNICIPAL Nº 012-2012-MDJLO</p>
+            <p class="inst-sub2">SUB GERENCIA DE TRANSITO - TRANSPORTES Y SEGURIDAD VIAL</p>
+            <div class="inst-banner">INSPECCIÓN TECNICA DE VEHICULOS MENORES</div>
+        </td>
+        <td style="width: 15%;" class="serie-box">
+            Nº {$serieSello}
+        </td>
+    </tr>
+</table>
+
+<!-- DATOS DEL VEHÍCULO Y OPERADOR -->
+<table class="data-card">
+    <tr>
+        <td style="width: 32%;">
+            <span class="lbl">N° DE REGISTRO:</span>
+            <span class="val-mono">{$registro}</span>
+        </td>
+        <td style="width: 38%;">
+            <span class="lbl">MARCA DE VEHICULO:</span>
+            <span class="val">{$marca}</span>
+        </td>
+        <td style="width: 30%; background-color: #f8fafc; text-align: center;">
+            <span style="font-size: 6.2pt; font-weight: bold; color: #004b93; text-transform: uppercase;">N° SERIE CERTICAV</span>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2" style="padding: 0; border: none;">
+            <table style="width: 100%;">
+                <tr>
+                    <td style="border: none; border-bottom: 1px solid #000; border-right: 1px solid #000;">
+                        <span class="lbl">RAZON SOCIAL DEL TRANSPORTADOR:</span>
+                        <span class="val">{$transportador}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: none; border-bottom: 1px solid #000; border-right: 1px solid #000;">
+                        <span class="lbl">PROPIETARIO DEL VEHICULO:</span>
+                        <span class="val">{$propietario}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: none; border-bottom: 1px solid #000; border-right: 1px solid #000;">
+                        <span class="lbl">CONDUCTOR:</span>
+                        <span class="val">{$conductor}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: none; border-right: 1px solid #000;">
+                        <span class="lbl">N° LICENCIA DE CONDUCTOR:</span>
+                        <span class="val-mono">{$licencia}</span>
+                    </td>
+                </tr>
+            </table>
+        </td>
+        <td style="padding: 0; border: none;">
+            <table style="width: 100%;">
+                <tr>
+                    <td style="border: none; border-bottom: 1px solid #000;">
+                        <table style="width: 100%;">
+                            <tr>
+                                <td style="width: 35%; border: none;"><span class="lbl">FECHA</span></td>
+                                <td style="width: 21%; text-align: center; border: 1px solid #000; font-weight: bold; font-size: 7pt;">{$dia}</td>
+                                <td style="width: 21%; text-align: center; border: 1px solid #000; font-weight: bold; font-size: 7pt;">{$mes}</td>
+                                <td style="width: 21%; text-align: center; border: 1px solid #000; font-weight: bold; font-size: 7pt;">{$anio}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: none; border-bottom: 1px solid #000;">
+                        <span class="lbl">N° DE PLACA:</span>
+                        <span class="val-mono" style="font-size: 9.5pt;">{$placa}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: none; border-bottom: 1px solid #000;">
+                        <span class="lbl">AÑO DE FABRICACIÓN:</span>
+                        <span class="val-mono">{$anioFab}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: none; padding: 0;">
+                        <table style="width: 100%;">
+                            <tr>
+                                <td style="width: 50%; border: none; border-right: 1px solid #000;">
+                                    <span class="lbl">MODELO:</span>
+                                    <span class="val" style="font-size: 6.5pt;">{$modelo}</span>
+                                </td>
+                                <td style="width: 50%; border: none;">
+                                    <span class="lbl">N° MOTOR:</span>
+                                    <span class="val-mono" style="font-size: 6.5pt;">{$motor}</span>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- CHECKLIST 2 COLUMNAS -->
+<table style="width: 100%;">
+    <tr>
+        <td style="width: 49.5%; vertical-align: top; padding: 0;">
+            <table class="col-table">
+                {$rowsIzq}
+            </table>
+        </td>
+        <td style="width: 1%;"></td>
+        <td style="width: 49.5%; vertical-align: top; padding: 0;">
+            <table class="col-table">
+                {$rowsDer}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- DICTAMEN Y LEYENDA -->
+<table class="eval-card">
+    <tr>
+        <td style="width: 32%;">
+            <div style="background-color: #004b93; color: #fff; font-size: 5.8pt; font-weight: bold; text-align: center; padding: 1px 0; margin-bottom: 2px;">PRIMERA EVALUACIÓN</div>
+            <table style="width: 100%;">
+                <tr>
+                    <td style="border: none; font-size: 6.2pt; font-weight: bold; padding: 0;">
+                        APROBADO <span class="box-check">{$checkP1A}</span>
+                    </td>
+                    <td style="border: none; font-size: 6.2pt; font-weight: bold; padding: 0; text-align: right;">
+                        DESAPROBADO <span class="box-check">{$checkP1D}</span>
+                    </td>
+                </tr>
+            </table>
+        </td>
+        <td style="width: 32%;">
+            <div style="background-color: #004b93; color: #fff; font-size: 5.8pt; font-weight: bold; text-align: center; padding: 1px 0; margin-bottom: 2px;">SEGUNDA EVALUACIÓN</div>
+            <table style="width: 100%;">
+                <tr>
+                    <td style="border: none; font-size: 6.2pt; font-weight: bold; padding: 0;">
+                        APROBADO <span class="box-check">{$checkP2A}</span>
+                    </td>
+                    <td style="border: none; font-size: 6.2pt; font-weight: bold; padding: 0; text-align: right;">
+                        DESAPROBADO <span class="box-check">{$checkP2D}</span>
+                    </td>
+                </tr>
+            </table>
+        </td>
+        <td style="width: 36%; text-align: center; font-weight: bold; font-size: 6.2pt;">
+            B= BIEN &middot; M.E.= MAL ESTADO &middot; N.T.= NO TIENE
+        </td>
+    </tr>
+</table>
+
+<!-- FIRMAS -->
+<table class="sig-card">
+    <tr>
+        <td style="width: 50%;">
+            <div style="background-color: #004b93; color: #fff; font-size: 5.8pt; font-weight: bold; padding: 1px 3px; text-transform: uppercase;">TECNICO RESPONSABLE:</div>
+            <div style="margin-top: 3px; font-size: 6.8pt;">
+                <span style="font-size: 5.8pt; color: #475569;">Nombre:</span> <strong>{$inspector}</strong>
+            </div>
+            <div style="margin-top: 18px; border-top: 1px dotted #64748b; padding-top: 2px; font-size: 5.8pt; color: #475569;">
+                Firma:
+            </div>
+        </td>
+        <td style="width: 50%;">
+            <div style="background-color: #004b93; color: #fff; font-size: 5.8pt; font-weight: bold; padding: 1px 3px; text-transform: uppercase;">PROPIETARIO Y/O CONDUCTOR DEL VEHICULO:</div>
+            <table style="width: 100%; margin-top: 3px;">
+                <tr>
+                    <td style="border: none; padding: 0; font-size: 6.8pt;">
+                        <span style="font-size: 5.8pt; color: #475569;">Nombre:</span> <strong>{$conductor}</strong>
+                    </td>
+                    <td style="border: none; padding: 0; text-align: right; font-size: 6.8pt;">
+                        <span style="font-size: 5.8pt; color: #475569;">D.N.I. Nº:</span> <strong style="font-family: monospace;">{$dniCond}</strong>
+                    </td>
+                </tr>
+            </table>
+            <table style="width: 100%; margin-top: 18px; border-top: 1px dotted #64748b; padding-top: 2px;">
+                <tr>
+                    <td style="border: none; padding: 0; font-size: 5.8pt; color: #475569;">Firma:</td>
+                    <td style="border: none; padding: 0; text-align: right; font-size: 5.2pt; color: #64748b;">Conductor / Titular Evaluado</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- PIE CON QR -->
+<table style="width: 100%; border-top: 1px solid #000; padding-top: 3px;">
+    <tr>
+        <td style="width: 86%; vertical-align: middle;">
+            <p class="legal-note">
+                <strong>Nota:</strong> Se otorgará un plazo de cinco (5) días para subsanar las observaciones para una 2da. evaluación, de corresponder. Declaro bajo juramento que los datos consignados en la presente Declaración Jurada son verdaderos, en caso contrario me someto a las acciones y sanciones contempladas en la Ley del Procedimiento Administrativo General Nº 27444.
+            </p>
+        </td>
+        <td style="width: 14%; text-align: center; vertical-align: middle;">
+            <img src="{$qrBase64}" style="width: 55px; height: 55px; display: block; margin: 0 auto;" alt="QR"><br>
+            <span style="font-size: 4.8pt; font-weight: bold; color: #004b93; display: block; margin-top: 1px;">VAL. DIGITAL</span>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>
+HTML;
     }
 }

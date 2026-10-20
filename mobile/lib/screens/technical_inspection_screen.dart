@@ -340,7 +340,7 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                     child: Text(
                       _esEdicion
                           ? 'Se actualizarán los datos de la inspección técnica dentro del tiempo de tolerancia permitido.'
-                          : 'Se enviará en estado PENDIENTE DE REVISIÓN para que el administrador la apruebe y oficialice en el sistema.',
+                          : 'Se registrará y oficializará directamente la inspección técnica CERTICAV aprobada en el sistema.',
                       style: const TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
                     ),
                   ),
@@ -380,7 +380,7 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      _esEdicion ? 'Sí, Guardar Cambios' : 'Sí, Enviar a Revisión',
+                      _esEdicion ? 'Sí, Guardar Cambios' : 'Sí, Registrar Inspección',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                     ),
                   ),
@@ -470,14 +470,14 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
             ),
             const SizedBox(height: 18),
             Text(
-              _esEdicion ? '¡Inspección Modificada!' : '¡Inspección Enviada!',
+              _esEdicion ? '¡Inspección Modificada!' : '¡Inspección Registrada!',
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19),
             ),
             const SizedBox(height: 8),
             Text(
               _esEdicion
                   ? 'Los cambios a la inspección técnica del vehículo $_placa se guardaron con éxito dentro de la tolerancia de 5 minutos.'
-                  : 'La inspección técnica del vehículo $_placa fue registrada en estado PENDIENTE DE REVISIÓN.',
+                  : 'La inspección técnica del vehículo $_placa fue registrada y aprobada exitosamente como oficial.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: Color(0xFF555555)),
             ),
@@ -1166,7 +1166,7 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
             ),
           ),
 
-          // Barra inferior fija con botón de Guardar / Enviar a revisión
+          // Barra inferior fija con botón de Guardar / Registrar inspección
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -1204,18 +1204,18 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                               ),
                               const SizedBox(width: 10),
-                              Text(_esEdicion ? 'Guardando Cambios...' : 'Enviando a Revisión...', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(_esEdicion ? 'Guardando Cambios...' : 'Registrando Inspección...', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(_esEdicion ? Icons.save_rounded : Icons.send_rounded, size: 18),
+                              Icon(_esEdicion ? Icons.save_rounded : Icons.verified_rounded, size: 18),
                               const SizedBox(width: 8),
                               Text(
                                 _esEdicion
                                     ? 'Guardar Cambios de Inspección'
-                                    : 'Guardar e Inspeccionar (Enviar a Revisión)',
+                                    : 'Guardar y Aprobar Inspección Técnica',
                                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                               ),
                             ],

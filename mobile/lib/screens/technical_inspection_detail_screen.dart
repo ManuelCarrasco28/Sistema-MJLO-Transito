@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../theme.dart';
+import '../utils/download_helper.dart';
 import 'technical_inspection_screen.dart';
+import 'pdf_viewer_screen.dart';
 
 class TechnicalInspectionDetailScreen extends StatefulWidget {
   final Map<String, dynamic> inspeccion;
@@ -68,6 +71,57 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
     if (res == true && mounted) {
       Navigator.pop(context, true); // Regresar al home recargando la lista
     }
+  }
+
+  void _verCerticavPdf() {
+    final id = _inspeccion['id'];
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontró el identificador de la inspección.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final registro = _inspeccion['numeroRegistro']?.toString() ?? 'CERTICAV';
+    final pdfUrl = '${ApiService.baseUrl}/mobile/inspecciones/$id/pdf';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PdfViewerScreen(
+          title: 'Ficha CERTICAV $registro',
+          subtitle: 'Documento Oficial A4',
+          pdfUrl: pdfUrl,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _descargarCerticavDirecto() async {
+    final id = _inspeccion['id'];
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontró el identificador de la inspección.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final registro = _inspeccion['numeroRegistro']?.toString() ?? 'CERTICAV';
+    final sanitizedRegistro = registro.replaceAll(RegExp(r'[^\w\s\.-]'), '_').replaceAll(' ', '_');
+    final nombreArchivo = 'Ficha_CERTICAV_$sanitizedRegistro.pdf';
+    final pdfUrl = '${ApiService.baseUrl}/mobile/inspecciones/$id/pdf';
+
+    await DownloadHelper.descargarYGuardar(
+      context,
+      url: pdfUrl,
+      nombreArchivo: nombreArchivo,
+    );
   }
 
   Widget _buildStatusBadge(String status) {
@@ -186,8 +240,8 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
     final detallesRaw = _inspeccion['detalles'];
     final List<dynamic> detalles = detallesRaw is List ? detallesRaw : [];
 
-    final bool esPendiente = estado == 'PENDIENTE_REVISION';
-    final bool puedeModificar = esPendiente && _segundosRestantes > 0;
+    final bool puedeModificar = estado != 'ANULADA' && _segundosRestantes > 0;
+    final bool esAprobado = resultado == 'APROBADO' && estado != 'ANULADA';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
@@ -196,6 +250,12 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
         backgroundColor: AppTheme.primaryBlue,
         elevation: 0,
         actions: [
+          if (esAprobado)
+            IconButton(
+              icon: const Icon(Icons.download_rounded),
+              tooltip: 'Descargar Documento CERTICAV (PDF)',
+              onPressed: _descargarCerticavDirecto,
+            ),
           if (puedeModificar)
             IconButton(
               icon: const Icon(Icons.edit_note_rounded),
@@ -212,7 +272,7 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Banner de Tolerancia de 5 Minutos si está pendiente y dentro del tiempo
+              // Banner de Tolerancia de 5 Minutos si está dentro del tiempo permitido
               if (puedeModificar)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -277,23 +337,54 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
-                        height: 44,
                         child: ElevatedButton.icon(
                           onPressed: _abrirEdicion,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFE65100),
                             foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            minimumSize: const Size.fromHeight(48),
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           icon: const Icon(Icons.edit_note_rounded, size: 20),
-                          label: const Text(
-                            'Modificar / Corregir Inspección',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Modificar / Corregir Inspección',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                            ),
                           ),
                         ),
                       ),
                     ],
+                  ),
+                ),
+
+              // Botón Morado de Descarga del Documento Oficial CERTICAV (PDF)
+              if (esAprobado)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _verCerticavPdf,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED), // Morado exacto del botón de imprimir de la web
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                      minimumSize: const Size.fromHeight(50),
+                      elevation: 1,
+                      shadowColor: const Color(0xFF7C3AED).withOpacity(0.35),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.description_rounded, size: 22),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        'Ver Documento CERTICAV (PDF)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                    ),
                   ),
                 ),
 
@@ -305,7 +396,7 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: esPendiente ? const Color(0xFFFFB74D) : const Color(0xFF81C784),
+                    color: const Color(0xFF81C784),
                     width: 1.5,
                   ),
                   boxShadow: [
@@ -320,16 +411,16 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: esPendiente ? const Color(0xFFFFF8E1) : const Color(0xFFE8F5E9),
+                            color: const Color(0xFFE8F5E9),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: esPendiente ? const Color(0xFFFFB74D) : const Color(0xFFA5D6A7),
+                              color: const Color(0xFFA5D6A7),
                             ),
                           ),
-                          child: Text(
-                            esPendiente ? 'PENDIENTE DE REVISIÓN' : 'OFICIAL / APROBADO',
+                          child: const Text(
+                            'OFICIAL / REGISTRADO',
                             style: TextStyle(
-                              color: esPendiente ? const Color(0xFFE65100) : const Color(0xFF1B5E20),
+                              color: Color(0xFF1B5E20),
                               fontSize: 10,
                               fontWeight: FontWeight.w900,
                             ),

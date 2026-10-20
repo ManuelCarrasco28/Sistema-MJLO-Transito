@@ -36,7 +36,9 @@ class ReportesIntervencionController extends ResourceController
                 COALESCE(NULLIF(TRIM(CONCAT(c_prop.nombres, ' ', c_prop.apellido_paterno, ' ', COALESCE(c_prop.apellido_materno, ''))), ''), r.dueno_informal_nombres, 'No Registrado') as propietarioNombre,
                 COALESCE(cond_per.numero, r.conductor_informal_dni, 'S/D') as conductorDni,
                 COALESCE(NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''), r.conductor_informal_nombres, 'No identificado') as conductorNombre,
-                r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre
+                r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre,
+                CASE WHEN r.estado = 'PENDIENTE' AND TIMESTAMPDIFF(SECOND, r.fecha_updated, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar,
+                GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, r.fecha_updated, NOW())) as segundosRestantesTolerancia
             ", false)
             ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
             ->join('trabajadores t', 't.id_persona = r.id_inspector', 'left')
@@ -563,5 +565,90 @@ class ReportesIntervencionController extends ResourceController
         }
 
         return $this->respond(['message' => 'Reporte rechazado correctamente.']);
+    }
+
+    public function update($id = null)
+    {
+        $db = \Config\Database::connect();
+        try {
+            $input = $this->request->getJSON(true) ?? [];
+            if (empty($input)) {
+                $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+            }
+
+            $db->transException(true)->transBegin();
+            $reporte = $db->query('SELECT * FROM reportes_intervencion WHERE id=? FOR UPDATE', [$id])->getRowArray();
+            if (!$reporte) {
+                throw new \DomainException('Reporte de intervención no encontrado.');
+            }
+            if ($reporte['estado'] !== 'PENDIENTE') {
+                throw new \DomainException('Solo se pueden modificar reportes en estado PENDIENTE.');
+            }
+
+            // Validar ventana de tolerancia de 5 minutos (300 segundos)
+            $checkTime = $db->query('SELECT TIMESTAMPDIFF(SECOND, fecha_updated, NOW()) as diff FROM reportes_intervencion WHERE id=?', [$id])->getRowArray();
+            $diff = (int)($checkTime['diff'] ?? 9999);
+            if ($diff > 300) {
+                throw new \DomainException('El período de tolerancia de 5 minutos ha expirado. Ya no es posible modificar este reporte.');
+            }
+
+            $data = [];
+            if (!empty($input['lugar'])) {
+                $data['lugar'] = mb_substr(trim($input['lugar']), 0, 250);
+            }
+            if (isset($input['observaciones'])) {
+                $data['observaciones'] = trim($input['observaciones']);
+            }
+            if (isset($input['observacionesConductor'])) {
+                $data['observaciones_conductor'] = trim($input['observacionesConductor']);
+            }
+            if (!empty($input['coordenadas'])) {
+                $data['coordenadas'] = trim($input['coordenadas']);
+            }
+            if (!empty($input['placa'])) {
+                $data['placa'] = \App\Libraries\Placa::normalizar($input['placa']);
+            }
+            if (isset($input['dni_conductor'])) {
+                $data['conductor_informal_dni'] = trim($input['dni_conductor']);
+            }
+            if (isset($input['nombres_conductor']) || isset($input['apellidos_conductor'])) {
+                $data['conductor_informal_nombres'] = trim(($input['nombres_conductor'] ?? '') . ' ' . ($input['apellidos_conductor'] ?? ''));
+            }
+            if (isset($input['dni_dueño']) || isset($input['dni_dueno'])) {
+                $data['dueno_informal_dni'] = trim($input['dni_dueño'] ?? $input['dni_dueno'] ?? '');
+            }
+            if (isset($input['nombres_dueño']) || isset($input['nombres_dueno']) || isset($input['apellidos_dueño']) || isset($input['apellidos_dueno'])) {
+                $data['dueno_informal_nombres'] = trim(($input['nombres_dueño'] ?? $input['nombres_dueno'] ?? '') . ' ' . ($input['apellidos_dueño'] ?? $input['apellidos_dueno'] ?? ''));
+            }
+
+            $infraccionesIds = $input['infraccionesIds'] ?? $input['tiposInfraccion'] ?? null;
+            if (is_array($infraccionesIds)) {
+                $db->table('reporte_intervencion_infracciones')->where('id_reporte', $id)->delete();
+                $infraccionesIds = array_values(array_unique(array_filter(array_map('intval', $infraccionesIds), static fn ($v) => $v > 0)));
+                foreach ($infraccionesIds as $tipoId) {
+                    $db->table('reporte_intervencion_infracciones')->insert([
+                        'id_reporte' => $id,
+                        'id_tipo_infraccion' => $tipoId,
+                    ]);
+                }
+            }
+
+            $data['fecha_updated'] = date('Y-m-d H:i:s');
+            $db->table('reportes_intervencion')->where('id', $id)->update($data);
+            $db->transCommit();
+
+            return $this->respond([
+                'status' => 200,
+                'message' => 'Reporte modificado exitosamente dentro del período de tolerancia.',
+                'data' => $data
+            ]);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
+            $db->transRollback();
+            return $this->failServerError('No se pudo modificar el reporte.');
+        }
     }
 }

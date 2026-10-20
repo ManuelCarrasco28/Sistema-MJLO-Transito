@@ -116,8 +116,8 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
     }).length;
   }
 
-  int get _pendientesRevision {
-    return _inspecciones.where((i) => (i['estado']?.toString() ?? '') == 'PENDIENTE_REVISION').length;
+  int get _aprobadasCount {
+    return _inspecciones.where((i) => (i['resultado']?.toString() ?? '') == 'APROBADO').length;
   }
 
   Widget _buildPlacaBadge(String placa) {
@@ -210,12 +210,13 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w900,
-                                          fontSize: 13.5,
+                                          fontSize: 12.5,
+                                          height: 1.15,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                        softWrap: true,
+                                        maxLines: 2,
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(height: 3),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
@@ -227,12 +228,13 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                                           _cargo,
                                           style: const TextStyle(
                                             color: Color(0xFF6EE7B7),
-                                            fontSize: 9.5,
+                                            fontSize: 9,
                                             fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.5,
+                                            letterSpacing: 0.3,
+                                            height: 1.15,
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          softWrap: true,
+                                          maxLines: 2,
                                         ),
                                       ),
                                     ],
@@ -248,25 +250,27 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.badge_outlined, color: Colors.white),
+                            icon: const Icon(Icons.badge_outlined, color: Colors.white, size: 21),
                             onPressed: _abrirPerfil,
                             tooltip: 'Ver perfil del inspector',
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: const EdgeInsets.all(4),
                           ),
+                          const SizedBox(width: 2),
                           IconButton(
-                            icon: const Icon(Icons.refresh, color: Colors.white),
+                            icon: const Icon(Icons.refresh, color: Colors.white, size: 21),
                             onPressed: () => _cargarHistorial(query: _buscarController.text),
                             tooltip: 'Actualizar',
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: const EdgeInsets.all(4),
                           ),
+                          const SizedBox(width: 2),
                           IconButton(
-                            icon: const Icon(Icons.logout_rounded, color: Colors.white70),
+                            icon: const Icon(Icons.logout_rounded, color: Colors.white70, size: 21),
                             onPressed: _cerrarSesion,
                             tooltip: 'Cerrar sesión',
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: const EdgeInsets.all(4),
                           ),
                         ],
                       ),
@@ -310,17 +314,17 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('En revisión', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                              const Text('Aprobadas', style: TextStyle(color: Colors.white70, fontSize: 11)),
                               const SizedBox(height: 4),
                               Row(
                                 children: [
                                   Text(
-                                    '$_pendientesRevision',
-                                    style: const TextStyle(color: Color(0xFFFBBF24), fontWeight: FontWeight.w900, fontSize: 22),
+                                    '$_aprobadasCount',
+                                    style: const TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 22),
                                   ),
                                   const SizedBox(width: 6),
-                                  if (_pendientesRevision > 0)
-                                    const Icon(Icons.pending_actions, size: 16, color: Color(0xFFFBBF24)),
+                                  if (_aprobadasCount > 0)
+                                    const Icon(Icons.verified_rounded, size: 16, color: Color(0xFF34D399)),
                                 ],
                               ),
                             ],
@@ -486,10 +490,8 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                             final resultado = insp['resultado']?.toString() ?? 'APROBADO';
                             final estado = insp['estado']?.toString() ?? 'ACTIVO';
                             final transportador = insp['transportador']?.toString() ?? '—';
-                            final esPendiente = estado == 'PENDIENTE_REVISION';
-
                             final int segTolerancia = int.tryParse(insp['segundosRestantesTolerancia']?.toString() ?? '') ?? 0;
-                            final bool puedeEditar = esPendiente && segTolerancia > 0;
+                            final bool puedeEditar = estado != 'ANULADA' && segTolerancia > 0;
 
                             return InkWell(
                               onTap: () async {
@@ -510,8 +512,8 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(18),
                                   border: Border.all(
-                                    color: esPendiente ? const Color(0xFFFFB74D) : Colors.grey.shade200,
-                                    width: esPendiente ? 1.5 : 1,
+                                    color: Colors.grey.shade200,
+                                    width: 1,
                                   ),
                                   boxShadow: [
                                     BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
@@ -525,55 +527,44 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                                       children: [
                                         _buildPlacaBadge(placa),
                                         const SizedBox(width: 8),
-                                        Flexible(
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Flexible(
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: esPendiente ? const Color(0xFFFFF8E1) : const Color(0xFFE8F5E9),
-                                                    borderRadius: BorderRadius.circular(8),
-                                                    border: Border.all(
-                                                      color: esPendiente ? const Color(0xFFFFB74D) : const Color(0xFFA5D6A7),
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    esPendiente ? 'PENDIENTE DE REVISIÓN' : 'OFICIAL / APROBADO',
-                                                    style: TextStyle(
-                                                      color: esPendiente ? const Color(0xFFE65100) : const Color(0xFF1B5E20),
-                                                      fontSize: 9,
-                                                      fontWeight: FontWeight.w900,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
+                                        if (puedeEditar)
+                                          InkWell(
+                                            onTap: () async {
+                                              final res = await Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => TechnicalInspectionScreen(inspeccionAEditar: insp),
                                                 ),
+                                              );
+                                              if (res == true) {
+                                                _cargarHistorial(query: _buscarController.text);
+                                              }
+                                            },
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFFF3E0),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: const Color(0xFFFFB74D)),
                                               ),
-                                              if (puedeEditar) ...[
-                                                const SizedBox(width: 4),
-                                                IconButton(
-                                                  icon: const Icon(Icons.edit_note_rounded, color: Color(0xFFE65100), size: 22),
-                                                  tooltip: 'Modificar dentro de tolerancia',
-                                                  constraints: const BoxConstraints(),
-                                                  padding: EdgeInsets.zero,
-                                                  onPressed: () async {
-                                                    final res = await Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder: (_) => TechnicalInspectionScreen(inspeccionAEditar: insp),
-                                                      ),
-                                                    );
-                                                    if (res == true) {
-                                                      _cargarHistorial(query: _buscarController.text);
-                                                    }
-                                                  },
-                                                ),
-                                              ],
-                                            ],
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.edit_note_rounded, color: Color(0xFFE65100), size: 16),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'Tolerancia ${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFBF360C),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                     const SizedBox(height: 8),

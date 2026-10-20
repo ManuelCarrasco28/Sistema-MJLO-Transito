@@ -125,6 +125,8 @@ class PapeletasController extends ResourceController
                     p.firma_conductor_observacion as firmaConductorObservacion,
                     p.monto_total as montoTotal,
                     p.estado,
+                    CASE WHEN p.estado != 'ANULADA' AND TIMESTAMPDIFF(SECOND, p.fecha_modificacion, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar,
+                    GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, p.fecha_modificacion, NOW())) as segundosRestantesTolerancia,
                     
                     ret.id as retencionId,
                     ret.estado as retencionEstado
@@ -589,6 +591,118 @@ class PapeletasController extends ResourceController
             log_message('error', '{exception}', ['exception' => $e]);
             $db->transRollback();
             return $this->failServerError('No se pudo actualizar la papeleta.');
+        }
+    }
+
+    public function modificarDesdeMovil($id = null)
+    {
+        $db = \Config\Database::connect();
+        try {
+            $input = $this->request->getJSON(true) ?? [];
+            if (empty($input)) {
+                $input = json_decode($this->request->getBody() ?: '', true) ?? $this->request->getPost();
+            }
+
+            $db->transException(true)->transBegin();
+            $papeleta = $db->query('SELECT * FROM papeletas WHERE id=? FOR UPDATE', [$id])->getRowArray();
+            if (!$papeleta) {
+                throw new \DomainException('Papeleta no encontrada.');
+            }
+            if ($papeleta['estado'] === 'ANULADA') {
+                throw new \DomainException('La papeleta se encuentra anulada.');
+            }
+
+            // Validar ventana de tolerancia de 5 minutos (300 segundos)
+            $checkTime = $db->query('SELECT TIMESTAMPDIFF(SECOND, fecha_modificacion, NOW()) as diff FROM papeletas WHERE id=?', [$id])->getRowArray();
+            $diff = (int)($checkTime['diff'] ?? 9999);
+            if ($diff > 300) {
+                throw new \DomainException('El período de tolerancia de 5 minutos ha expirado. Ya no es posible modificar esta infracción.');
+            }
+
+            $data = [];
+            if (!empty($input['lugar'])) {
+                $data['lugar'] = mb_substr(trim($input['lugar']), 0, 200);
+            }
+            if (isset($input['observacionesAutoridad'])) {
+                $data['observacion_autoridad'] = mb_substr(trim($input['observacionesAutoridad']), 0, 500);
+            }
+            if (isset($input['observacionesConductor'])) {
+                $data['observaciones_conductor'] = mb_substr(trim($input['observacionesConductor']), 0, 500);
+            }
+            if (!empty($input['vehiculoPlaca'])) {
+                $data['placa'] = \App\Libraries\Placa::normalizar($input['vehiculoPlaca']);
+            }
+            if (isset($input['conductorDni'])) {
+                $data['conductor_informal_dni'] = trim($input['conductorDni']);
+            }
+            if (isset($input['conductorNombres']) || isset($input['conductorApellidos'])) {
+                $nomb = trim(($input['conductorNombres'] ?? '') . ' ' . ($input['conductorApellidos'] ?? ''));
+                if (!empty($nomb)) {
+                    $data['conductor_informal_nombres'] = $nomb;
+                }
+            }
+            if (isset($input['infractor'])) {
+                $data['nombre_autoridad'] = trim($input['infractor']);
+            }
+            if (isset($input['duenoDni'])) {
+                $data['dueño_informal_dni'] = trim($input['duenoDni']);
+            }
+            if (isset($input['duenoNombres']) || isset($input['duenoApellidos'])) {
+                $nombD = trim(($input['duenoNombres'] ?? '') . ' ' . ($input['duenoApellidos'] ?? ''));
+                if (!empty($nombD)) {
+                    $data['dueño_informal_nombres'] = $nombD;
+                }
+            }
+
+            // Si se corrigieron los tipos de infracción
+            $infraccionesList = $input['tiposInfraccion'] ?? $input['infraccionesIds'] ?? null;
+            if (!empty($infraccionesList) && is_array($infraccionesList)) {
+                $db->table('papeleta_detalles')->where('id_papeleta', $id)->delete();
+                $montoTotal = 0.0;
+                foreach ($infraccionesList as $tId) {
+                    $tipo = $db->table('tipos_infraccion')->where('id', (int)$tId)->get()->getRowArray();
+                    if ($tipo) {
+                        $monto = (float)$tipo['monto'];
+                        $montoTotal += $monto;
+                        $db->table('papeleta_detalles')->insert([
+                            'id_papeleta' => $id,
+                            'id_tipo_infraccion' => (int)$tId,
+                            'monto' => $monto,
+                        ]);
+                    }
+                }
+                $data['monto_total'] = $montoTotal;
+            } elseif (!empty($input['tipoInfraccionId'])) {
+                $tId = (int)$input['tipoInfraccionId'];
+                $tipo = $db->table('tipos_infraccion')->where('id', $tId)->get()->getRowArray();
+                if ($tipo) {
+                    $db->table('papeleta_detalles')->where('id_papeleta', $id)->delete();
+                    $monto = (float)$tipo['monto'];
+                    $db->table('papeleta_detalles')->insert([
+                        'id_papeleta' => $id,
+                        'id_tipo_infraccion' => $tId,
+                        'monto' => $monto,
+                    ]);
+                    $data['monto_total'] = $monto;
+                }
+            }
+
+            $data['fecha_modificacion'] = date('Y-m-d H:i:s');
+            $db->table('papeletas')->where('id', $id)->update($data);
+            $db->transCommit();
+
+            return $this->respond([
+                'status' => 200,
+                'message' => 'Infracción modificada exitosamente dentro del período de tolerancia.',
+                'data' => $data
+            ]);
+        } catch (\DomainException $e) {
+            $db->transRollback();
+            return $this->failValidationErrors($e->getMessage());
+        } catch (\Throwable $e) {
+            log_message('error', '{exception}', ['exception' => $e]);
+            $db->transRollback();
+            return $this->failServerError('No se pudo modificar la papeleta.');
         }
     }
 

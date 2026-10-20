@@ -364,7 +364,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
   }
 
   Widget _buildActionButton() {
-    bool hasExpiredDocs = _documents.any((doc) => doc['estado'] != 'VIGENTE');
+    final allDocs = _obtenerListaDocumentos();
+    final bool hasExpiredDocs = allDocs.any((doc) => doc['estado'] != 'VIGENTE');
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -586,28 +587,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 );
               }
               
-              final expectedDocs = ['TARJETA_OPERATIVIDAD', 'TARJETA_PROPIEDAD', 'SOAT', 'CERTICAV'];
-              final List<dynamic> allDocs = List.from(_documents);
-
-              if (_vehicleData?['certicav'] != null &&
-                  !allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == 'CERTICAV')) {
-                final c = _vehicleData!['certicav'];
-                allDocs.add({
-                  'tipoDocumento': 'CERTICAV',
-                  'codigo': c['numeroSerieCerticav'] ?? c['numeroRegistro'],
-                  'estado': c['resultado'] ?? c['estado'] ?? 'VIGENTE',
-                  'fechaExpiracion': c['fecha'],
-                });
-              }
-
-              for (var expected in expectedDocs) {
-                if (!allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == expected)) {
-                  allDocs.add({
-                    'tipoDocumento': expected,
-                    'estado': 'NO REGISTRADO',
-                  });
-                }
-              }
+              final allDocs = _obtenerListaDocumentos();
 
               return ListView.builder(
                 shrinkWrap: true,
@@ -700,19 +680,109 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
     }
   }
 
+  List<Map<String, dynamic>> _obtenerListaDocumentos() {
+    final expectedDocs = ['TARJETA_OPERATIVIDAD', 'TARJETA_PROPIEDAD', 'SOAT', 'CERTICAV'];
+    final List<Map<String, dynamic>> allDocs = [];
+    final hoy = DateTime.now().toIso8601String().substring(0, 10);
+
+    for (final d in _documents) {
+      if (d is Map) {
+        final map = Map<String, dynamic>.from(d);
+        final fExp = map['fechaExpiracion']?.toString().trim();
+        if (fExp != null && fExp.isNotEmpty && fExp != '-') {
+          map['estado'] = (fExp.compareTo(hoy) < 0) ? 'VENCIDO' : 'VIGENTE';
+        }
+        allDocs.add(map);
+      }
+    }
+
+    if (_vehicleData?['certicav'] != null &&
+        !allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == 'CERTICAV')) {
+      final c = _vehicleData!['certicav'];
+      final fInicio = c['fecha']?.toString().trim();
+      final fFin = (c['fechaVencimiento'] ?? c['fechaExpiracion'])?.toString().trim();
+
+      String estado = c['estadoVigencia'] ?? '';
+      if (estado.isEmpty || estado == 'APROBADO') {
+        if (fFin != null && fFin.isNotEmpty && fFin != '-') {
+          estado = (fFin.compareTo(hoy) < 0) ? 'VENCIDO' : 'VIGENTE';
+        } else {
+          estado = (c['resultado'] == 'APROBADO') ? 'VIGENTE' : (c['resultado'] ?? 'VIGENTE');
+        }
+      }
+
+      allDocs.add({
+        'tipoDocumento': 'CERTICAV',
+        'codigo': c['numeroSerieCerticav'] ?? c['numeroRegistro'],
+        'estado': estado,
+        'fechaExpedicion': fInicio,
+        'fechaExpiracion': fFin,
+      });
+    }
+
+    for (var expected in expectedDocs) {
+      if (!allDocs.any((d) => (d['tipoDocumento'] ?? '').toString().toUpperCase() == expected)) {
+        allDocs.add({
+          'tipoDocumento': expected,
+          'estado': 'NO REGISTRADO',
+        });
+      }
+    }
+
+    return allDocs;
+  }
+
   Widget _buildDocumentCard(Map<String, dynamic> doc) {
-    bool isExpired = doc['estado'] != 'VIGENTE';
-    bool isMissing = doc['estado'] == 'NO REGISTRADO';
-    
+    final estadoRaw = (doc['estado'] ?? 'DESCONOCIDO').toString().toUpperCase().trim();
+    final fechaExp = (doc['fechaExpiracion'] ?? '').toString().trim();
+    final fechaExpedicion = (doc['fechaExpedicion'] ?? doc['fecha'] ?? '').toString().trim();
+    final hoy = DateTime.now().toIso8601String().substring(0, 10);
+
+    bool isMissing = estadoRaw == 'NO REGISTRADO' || estadoRaw == 'FALTANTE' || estadoRaw == 'SIN_REGISTRO';
+    bool isExpired = false;
+
+    if (!isMissing) {
+      if (fechaExp.isNotEmpty && fechaExp != '-') {
+        isExpired = fechaExp.compareTo(hoy) < 0;
+      } else if (estadoRaw == 'VENCIDO' || estadoRaw == 'DESAPROBADO' || estadoRaw == 'ANULADA' || estadoRaw == 'ANULADO') {
+        isExpired = true;
+      }
+    }
+
+    String badgeText;
+    Color statusColor;
+    IconData statusIcon;
+
+    if (isMissing) {
+      badgeText = 'NO REGISTRADO';
+      statusColor = const Color(0xFFEF4444);
+      statusIcon = Icons.cancel;
+    } else if (isExpired) {
+      badgeText = 'VENCIDO';
+      statusColor = const Color(0xFFDC2626);
+      statusIcon = Icons.gpp_bad;
+    } else {
+      badgeText = 'VIGENTE';
+      statusColor = const Color(0xFF16A34A);
+      statusIcon = Icons.gpp_good;
+    }
+
+    final String? codigo = (doc['codigo'] != null && doc['codigo'].toString().trim().isNotEmpty)
+        ? doc['codigo'].toString().trim()
+        : null;
+
+    final String fechaIniDisplay = (fechaExpedicion.isNotEmpty && fechaExpedicion != '-') ? fechaExpedicion : '';
+    final String fechaFinDisplay = (fechaExp.isNotEmpty && fechaExp != '-') ? fechaExp : '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isExpired ? Colors.red.shade300 : Colors.green.shade300, width: 1.5),
+        border: Border.all(color: (isExpired || isMissing) ? Colors.red.shade300 : Colors.green.shade300, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: (isExpired ? Colors.red : Colors.green).withOpacity(0.05),
+            color: (isExpired || isMissing ? Colors.red : Colors.green).withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -721,20 +791,21 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: (isExpired ? Colors.red : Colors.green).withOpacity(0.1),
+                color: statusColor.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                isMissing ? Icons.cancel : (isExpired ? Icons.gpp_bad : Icons.gpp_good),
-                color: isExpired ? Colors.red : Colors.green,
+                statusIcon,
+                color: statusColor,
                 size: 28,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -743,31 +814,62 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                     _formatTipoDocumento(doc['tipoDocumento']),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 15.5,
                       color: Colors.grey.shade800,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    isMissing
-                        ? 'Documento faltante en el padrón'
-                        : (doc['codigo'] != null && doc['codigo'].toString().trim().isNotEmpty
-                            ? 'N°: ${doc['codigo']} • Vence: ${doc['fechaExpiracion'] ?? '-'}'
-                            : 'Vence: ${doc['fechaExpiracion'] ?? '-'}'),
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                  ),
+                  if (isMissing)
+                    Text(
+                      'Documento faltante en el padrón',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5),
+                    )
+                  else ...[
+                    if (codigo != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          'N°: $codigo',
+                          style: TextStyle(color: Colors.grey.shade700, fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    if (fechaIniDisplay.isNotEmpty && fechaFinDisplay.isNotEmpty)
+                      Text(
+                        'Inicio: $fechaIniDisplay  •  Vence: $fechaFinDisplay',
+                        style: TextStyle(
+                          color: isExpired ? Colors.red.shade700 : Colors.grey.shade600,
+                          fontSize: 11.5,
+                          fontWeight: isExpired ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      )
+                    else if (fechaFinDisplay.isNotEmpty)
+                      Text(
+                        'Vence: $fechaFinDisplay',
+                        style: TextStyle(
+                          color: isExpired ? Colors.red.shade700 : Colors.grey.shade600,
+                          fontSize: 12,
+                          fontWeight: isExpired ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      )
+                    else if (fechaIniDisplay.isNotEmpty)
+                      Text(
+                        'Inicio: $fechaIniDisplay',
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                      ),
+                  ],
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: isExpired ? Colors.red : Colors.green,
+                color: statusColor,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                (doc['estado'] ?? 'DESCONOCIDO').toString().replaceAll('_', ' '),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                badgeText,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
               ),
             ),
           ],

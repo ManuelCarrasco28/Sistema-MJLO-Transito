@@ -638,32 +638,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               future: SharedPreferences.getInstance(),
               builder: (context, snapshot) {
                 final prefs = snapshot.data;
-                final nombre =
-                    prefs?.getString('nombres')?.split(' ').first ??
-                    'Inspector';
-                final apellido =
-                    prefs?.getString('apellidos')?.split(' ').first ?? '';
+                final nombre = prefs?.getString('nombres') ?? 'Inspector';
+                final apellido = prefs?.getString('apellidos') ?? '';
+                final cargo = (prefs?.getString('cargo') ?? '').toUpperCase();
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Insp. $nombre $apellido',
+                      '$nombre $apellido'.trim().toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 13.5,
+                        height: 1.15,
                       ),
+                      softWrap: true,
+                      maxLines: 2,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _operativoActivo != null
-                          ? 'Operativo: ${_operativoActivo!['nombre']}'
-                          : 'Sin operativo asignado',
+                      cargo.isNotEmpty
+                          ? cargo
+                          : (_operativoActivo != null
+                              ? 'Operativo: ${_operativoActivo!['nombre']}'
+                              : 'Sin operativo asignado'),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 11,
+                        height: 1.15,
                       ),
+                      softWrap: true,
+                      maxLines: 2,
                     ),
                   ],
                 );

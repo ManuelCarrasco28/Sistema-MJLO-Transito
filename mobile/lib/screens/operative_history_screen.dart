@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
 import '../theme.dart';
+import 'issue_ticket_screen.dart';
 
 class OperativeHistoryScreen extends StatelessWidget {
   final Map<String, dynamic> operativo;
@@ -191,21 +192,76 @@ class OperativeHistoryScreen extends StatelessWidget {
                 }
 
                 final montoText = esReporte ? '' : '\nMonto Total: S/ ${data['montoTotal'] ?? 0}';
+                final int segTolerancia = int.tryParse(data['segundosRestantesTolerancia']?.toString() ?? '') ?? 0;
+                final bool puedeEditar = (data['puedeEditar'] == true || data['puedeEditar'] == 1 || data['puedeEditar'] == '1') && segTolerancia > 0;
 
                 return Card(
                   elevation: 2,
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: avatarBgColor)),
-                  child: ListTile(
-                    leading: CircleAvatar(backgroundColor: avatarBgColor, child: Icon(iconData, color: cardColor)),
-                    title: Text('$tipoTexto - $numDoc', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    subtitle: Text('Vehículo: $identificador$montoText'),
-                    isThreeLine: true,
-                    trailing: TextButton.icon(
-                      icon: const Icon(Icons.visibility, size: 18),
-                      label: const Text('Ver'),
-                      style: TextButton.styleFrom(foregroundColor: cardColor),
-                      onPressed: () => _showDetails(context, data, isFormal, esReporte, identificador),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      leading: CircleAvatar(backgroundColor: avatarBgColor, child: Icon(iconData, color: cardColor)),
+                      title: Text('$tipoTexto - $numDoc', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Vehículo: $identificador$montoText'),
+                          if (puedeEditar) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF3E0),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFFFB74D)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFE65100)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Tolerancia activa: ${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')} para corregir',
+                                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFFBF360C)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      isThreeLine: true,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (puedeEditar)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4.0),
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                                label: Text(
+                                  '${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')}',
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFBF360C),
+                                  backgroundColor: const Color(0xFFFFF3E0),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFFFB74D))),
+                                ),
+                                onPressed: () => _abrirModificar(context, data, esReporte),
+                              ),
+                            ),
+                          TextButton.icon(
+                            icon: const Icon(Icons.visibility, size: 18),
+                            label: const Text('Ver'),
+                            style: TextButton.styleFrom(foregroundColor: cardColor),
+                            onPressed: () => _showDetails(context, data, isFormal, esReporte, identificador),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -221,6 +277,8 @@ class OperativeHistoryScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) {
+        final int segTolerancia = int.tryParse(data['segundosRestantesTolerancia']?.toString() ?? '') ?? 0;
+        final bool puedeEditar = (data['puedeEditar'] == true || data['puedeEditar'] == 1 || data['puedeEditar'] == '1') && segTolerancia > 0;
         final numDoc = esReporte ? 'REP N° ${data['id']}' : (data['numeroPapeleta'] ?? 'PAP N° ${data['id']}');
         
         final placaForCheck = (data['vehiculoPlaca']?.toString() ?? data['placa_visual']?.toString() ?? '');
@@ -349,6 +407,28 @@ class OperativeHistoryScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (puedeEditar)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFFB74D)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, size: 18, color: Color(0xFFE65100)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Tolerancia activa: ${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')} para corregir datos',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFBF360C)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 _buildDetailRow('Documento:', numDoc, isBold: true),
                 _buildDetailRow('Vehículo:', '$identificador ($tipoTextoVehiculo)'),
                 if (!esReporte && isFormal && data['vehiculoAsociacion'] != null)
@@ -459,6 +539,23 @@ class OperativeHistoryScreen extends StatelessWidget {
             ),
           ),
           actions: [
+            if (puedeEditar)
+              ElevatedButton.icon(
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: Text('Modificar (${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')})'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _abrirModificar(context, data, esReporte);
+                },
+              ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
@@ -474,6 +571,18 @@ class OperativeHistoryScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  Future<void> _abrirModificar(BuildContext context, dynamic data, bool esReporte) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IssueTicketScreen(
+          papeletaAEditar: esReporte ? null : Map<String, dynamic>.from(data),
+          reporteAEditar: esReporte ? Map<String, dynamic>.from(data) : null,
+        ),
+      ),
     );
   }
 
