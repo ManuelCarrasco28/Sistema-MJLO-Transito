@@ -69,7 +69,7 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
     );
 
     if (res == true && mounted) {
-      Navigator.pop(context, true); // Regresar al home recargando la lista
+      Navigator.pop(context, true);
     }
   }
 
@@ -272,7 +272,6 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Banner de Tolerancia de 5 Minutos si está dentro del tiempo permitido
               if (puedeModificar)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -361,7 +360,6 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
                   ),
                 ),
 
-              // Botón Morado de Descarga del Documento Oficial CERTICAV (PDF)
               if (esAprobado)
                 Container(
                   margin: const EdgeInsets.only(bottom: 14),
@@ -369,7 +367,7 @@ class _TechnicalInspectionDetailScreenState extends State<TechnicalInspectionDet
                   child: ElevatedButton.icon(
                     onPressed: _verCerticavPdf,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF7C3AED), // Morado exacto del botón de imprimir de la web
+                      backgroundColor: const Color(0xFF7C3AED),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                       minimumSize: const Size.fromHeight(50),

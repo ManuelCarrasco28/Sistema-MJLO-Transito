@@ -762,7 +762,7 @@ class ApiService {
     return [];
   }
 
-  /// Registra la inspección técnica aprobada directamente en estado oficial ACTIVO
+  /// Registra la inspección técnica
   static Future<Map<String, dynamic>> enviarInspeccionTecnica(
     Map<String, dynamic> data,
   ) async {
@@ -783,7 +783,7 @@ class ApiService {
     throw Exception(_extractError(response.body, 'No se pudo enviar la inspección técnica.'));
   }
 
-  /// Modifica una inspección técnica existente dentro de la ventana de tolerancia de 5 minutos
+  /// Modifica una inspección técnica existente
   static Future<Map<String, dynamic>> modificarInspeccionTecnica(
     int inspeccionId,
     Map<String, dynamic> data,
@@ -805,7 +805,7 @@ class ApiService {
     throw Exception(_extractError(response.body, 'No se pudo modificar la inspección técnica.'));
   }
 
-  /// Modifica una papeleta (infracción) dentro de la tolerancia de 5 minutos
+  /// Modifica una papeleta
   static Future<Map<String, dynamic>> modificarPapeleta(
     int papeletaId,
     Map<String, dynamic> data,
@@ -827,7 +827,7 @@ class ApiService {
     throw Exception(_extractError(response.body, 'No se pudo modificar la papeleta.'));
   }
 
-  /// Modifica un reporte de intervención dentro de la tolerancia de 5 minutos
+  /// Modifica un reporte de intervención
   static Future<Map<String, dynamic>> modificarReporte(
     int reporteId,
     Map<String, dynamic> data,

@@ -130,7 +130,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
         top: false,
         child: Column(
           children: [
-          // Banner de aviso formal
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -153,7 +152,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
             ),
           ),
 
-          // Buscador
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -192,7 +190,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
             ),
           ),
 
-          // Lista de Vehículos Formales
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -326,7 +323,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
                                       ),
                                       const SizedBox(height: 12),
 
-                                      // Asociación formal
                                       Row(
                                         children: [
                                           const Icon(Icons.business, size: 16, color: AppTheme.primaryBlue),
@@ -347,7 +343,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
                                       ),
                                       const SizedBox(height: 6),
 
-                                      // Propietario
                                       Row(
                                         children: [
                                           Icon(Icons.person_outline, size: 16, color: Colors.grey.shade600),
@@ -368,7 +363,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
                                       ),
                                       const SizedBox(height: 6),
 
-                                      // Marca / Modelo / Año
                                       Row(
                                         children: [
                                           Icon(Icons.two_wheeler, size: 16, color: Colors.grey.shade500),
@@ -384,7 +378,6 @@ class _SelectFormalVehicleScreenState extends State<SelectFormalVehicleScreen> {
                                       ),
                                       const SizedBox(height: 12),
 
-                                      // Botón acción
                                       Container(
                                         width: double.infinity,
                                         padding: const EdgeInsets.symmetric(vertical: 9),

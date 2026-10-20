@@ -895,7 +895,7 @@ class InspeccionesController extends ResourceController
             return $this->failValidationErrors('Debe seleccionar un vehículo válido.');
         }
 
-        // VALIDACIÓN ESTRICTA: Solo vehículos FORMALES (con id_asociacion)
+        // Solo vehiculos formales
         $vehiculo = $db->table('vehiculos')
             ->select('id, placa, id_asociacion, estado')
             ->where('id', $vehiculoId)
@@ -979,7 +979,7 @@ class InspeccionesController extends ResourceController
                 $idPago = (int)$pagoDisp['id'];
             }
         } catch (\Throwable $e) {
-            // No bloquea el guardado en estado pendiente de revisión
+            // Continuar si no se pudo asociar el pago
         }
 
         $candado = (int)($db->query("SELECT GET_LOCK('mjlo_certicav', 10) AS l")->getRowArray()['l'] ?? 0) === 1;
@@ -1090,7 +1090,7 @@ class InspeccionesController extends ResourceController
             return $this->failForbidden('No tiene permisos para modificar una inspección realizada por otro inspector.');
         }
 
-        // Tolerancia estricta de 5 minutos (300 segundos) desde la creación
+        // Tolerancia de 5 minutos
         $segundosTranscurridos = (int)($db->query("SELECT TIMESTAMPDIFF(SECOND, ?, NOW()) AS seg", [$row['fecha_modificacion']])->getRowArray()['seg'] ?? 999);
         if ($segundosTranscurridos > 300) {
             return $this->failValidationErrors('Ha superado el tiempo de tolerancia de 5 minutos para modificar esta inspección técnica.');
@@ -1120,7 +1120,7 @@ class InspeccionesController extends ResourceController
                 'primera_evaluacion' => $primeraEvaluacion,
                 'resultado'          => $resultado,
                 'observaciones'      => $observaciones,
-                // Preservar la fecha_modificacion original para que la tolerancia sea estrictamente desde el inicio
+                // Mantener fecha_modificacion original
                 'fecha_modificacion' => $row['fecha_modificacion'],
             ];
 

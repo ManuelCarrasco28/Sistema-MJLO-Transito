@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 class DownloadHelper {
   static const MethodChannel _channel = MethodChannel('com.angelus.app_transito/download');
 
-  /// Abre un documento PDF usando el visor o selector de aplicaciones del sistema
   static Future<void> abrirPdfNativo(String uriString) async {
     try {
       if (Platform.isAndroid) {
@@ -18,9 +17,6 @@ class DownloadHelper {
     }
   }
 
-  /// Guarda bytes directamente en la carpeta pública de Descargas (Downloads)
-  /// En Android utiliza MediaStore.Downloads (API 29+) para que el archivo aparezca
-  /// inmediatamente en "Descargas" / "Mis Archivos" sin requerir permisos especiales.
   static Future<String?> guardarArchivo(Uint8List bytes, String nombreArchivo) async {
     if (Platform.isAndroid) {
       try {
@@ -36,7 +32,6 @@ class DownloadHelper {
       }
     }
 
-    // Fallback estándar con path_provider
     try {
       Directory? dir = await getDownloadsDirectory();
       dir ??= await getApplicationDocumentsDirectory();
@@ -56,8 +51,6 @@ class DownloadHelper {
     }
   }
 
-  /// Descarga un PDF desde una URL o guarda los bytes ya descargados
-  /// sin abrir navegadores externos en ningún momento.
   static Future<bool> descargarYGuardar(
     BuildContext context, {
     required String url,

@@ -504,8 +504,8 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(ctx); // Cierra dialog
-                  Navigator.pop(context, true); // Regresa de pantalla de inspección
+                  Navigator.pop(ctx);
+                  Navigator.pop(context, true);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryBlue,
@@ -688,7 +688,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Banner de Tolerancia si es Edición
                   if (_esEdicion)
                     Container(
                       margin: const EdgeInsets.only(bottom: 14),
@@ -748,7 +747,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                         ],
                       ),
                     ),
-                  // 1. DOCUMENTO Y REGISTRO
                   _buildSeccionContainer(
                     titulo: 'Documento y Registro',
                     child: Column(
@@ -799,7 +797,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                     ),
                   ),
 
-                  // 2. VEHÍCULO Y TRANSPORTADOR
                   _buildSeccionContainer(
                     titulo: 'Vehículo y Transportador',
                     child: Column(
@@ -827,13 +824,11 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                     ),
                   ),
 
-                  // 3. PROPIETARIO, CONDUCTOR Y TÉCNICO
                   _buildSeccionContainer(
                     titulo: 'Propietario, Conductor y Técnico',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Switch / Checkbox "El conductor es el mismo propietario"
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
@@ -926,13 +921,11 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                     ),
                   ),
 
-                  // 4. CHECKLIST TÉCNICO
                   _buildSeccionContainer(
                     titulo: 'Checklist Técnico CERTICAV',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Leyenda y botón Todo Bien
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -991,7 +984,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Subsecciones agrupadas
                         ...seccionesMap.entries.map((entry) {
                           final secNombre = entry.key;
                           final items = entry.value;
@@ -1060,7 +1052,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                                     ),
                                     child: Row(
                                       children: [
-                                        // Código chip
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                           decoration: BoxDecoration(
@@ -1080,7 +1071,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                                         ),
                                         const SizedBox(width: 8),
 
-                                        // Nombre criterio
                                         Expanded(
                                           child: Text(
                                             nombre,
@@ -1092,7 +1082,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                                           ),
                                         ),
 
-                                        // Botones B / M.E. / N.T.
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -1115,7 +1104,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                     ),
                   ),
 
-                  // 5. DICTAMEN FINAL Y OBSERVACIONES
                   _buildSeccionContainer(
                     titulo: 'Dictamen Final',
                     child: Column(
@@ -1166,7 +1154,6 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
             ),
           ),
 
-          // Barra inferior fija con botón de Guardar / Registrar inspección
           Container(
             decoration: BoxDecoration(
               color: Colors.white,

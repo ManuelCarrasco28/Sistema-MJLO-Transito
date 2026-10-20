@@ -618,7 +618,7 @@ class PapeletasController extends ResourceController
                 throw new \DomainException('Esta infracción fue procesada por la administración y no puede ser modificada desde la aplicación.');
             }
 
-            // Validar ventana de tolerancia de 5 minutos (300 segundos)
+            // Tolerancia de 5 minutos
             $checkTime = $db->query('SELECT TIMESTAMPDIFF(SECOND, fecha_modificacion, NOW()) as diff FROM papeletas WHERE id=?', [$id])->getRowArray();
             $diff = (int)($checkTime['diff'] ?? 9999);
             if ($diff > 300) {

@@ -162,7 +162,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
       _nombresConductor.text = (edit['conductorNombre'] ?? edit['conductor_informal_nombres'] ?? edit['nombres_conductor'] ?? edit['conductorNombres'] ?? edit['infractor'] ?? '').toString();
       _apellidosConductor.text = (edit['conductorApellidos'] ?? edit['apellidos_conductor'] ?? '').toString();
 
-      _conductorEsDueno = false; // Permitir ver y editar campos del conductor
+      _conductorEsDueno = false;
 
       // Cargar infracciones seleccionadas previamente
       List<String> ids = [];
@@ -508,7 +508,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('¡Papeleta generada con éxito!'), backgroundColor: Colors.green),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst); // Volver al detalle
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       _showError('Error al generar papeleta: $e');
@@ -553,14 +553,14 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
         'claseVehiculo': _effectiveVehicleData['tipo'] ?? '',
         'marcaVehiculo': _effectiveVehicleData['marca'] ?? '',
         'colorVehiculo': _effectiveVehicleData['color'] ?? '',
-        'motorVehiculo': '', // Not easily available in simple formal view sometimes
+        'motorVehiculo': '',
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Reporte enviado a administración para revisión.'), backgroundColor: Colors.green),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst); // Volver al detalle
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       _showError('Error al guardar reporte: $e');
@@ -958,7 +958,7 @@ class _IssueTicketScreenState extends State<IssueTicketScreen> {
                                       headingAccuracy: 0.0,
                                     );
                                     _coordenadasController.text = '${point.latitude}, ${point.longitude}';
-                                    _lugar = _lugarController.text; // Ensure lugar is updated
+                                    _lugar = _lugarController.text;
                                   });
                                 },
                               ),

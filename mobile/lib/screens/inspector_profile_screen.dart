@@ -281,7 +281,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + bottomInset),
                 child: Column(
                   children: [
-                    // Tarjeta Principal de Identidad
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(bottom: 16),
@@ -303,7 +302,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                       ),
                       child: Column(
                         children: [
-                          // Escudo / Avatar
                           Container(
                             width: 78,
                             height: 78,
@@ -324,7 +322,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Nombre Completo
                           Text(
                             nombreCompleto,
                             textAlign: TextAlign.center,
@@ -337,7 +334,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                           ),
                           const SizedBox(height: 6),
 
-                          // Badge de Cargo
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
@@ -358,7 +354,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                           ),
                           const SizedBox(height: 10),
 
-                          // Estado de cuenta
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -385,7 +380,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                       ),
                     ),
 
-                    // Información Laboral e Institucional
                     _buildSectionCard(
                       title: 'Datos Laborales e Institucionales',
                       headerIcon: Icons.business_rounded,
@@ -426,7 +420,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                       ],
                     ),
 
-                    // Datos Personales y de Contacto
                     _buildSectionCard(
                       title: 'Identidad y Contacto',
                       headerIcon: Icons.badge_rounded,
@@ -467,7 +460,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                       ],
                     ),
 
-                    // Botón Cerrar Sesión
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(top: 8, bottom: 12),
@@ -489,7 +481,6 @@ class _InspectorProfileScreenState extends State<InspectorProfileScreen> {
                       ),
                     ),
 
-                    // Pie institucional
                     Text(
                       'Sistema de Fiscalización y Tránsito • MDJLO v2.0',
                       style: TextStyle(

@@ -165,7 +165,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Cabecera superior institucional
             Container(
               padding: const EdgeInsets.fromLTRB(20, 16, 16, 20),
               decoration: const BoxDecoration(
@@ -180,7 +179,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Inspector Info (Tappable para ver perfil completo)
                       Expanded(
                         child: InkWell(
                           onTap: _abrirPerfil,
@@ -278,7 +276,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  // Tarjetas Resumen Rápidas
                   Row(
                     children: [
                       Expanded(
@@ -337,7 +334,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
               ),
             ),
 
-            // Botón Principal de Acción "NUEVA INSPECCIÓN CERTICAV"
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: InkWell(
@@ -410,7 +406,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
               ),
             ),
 
-            // Encabezado Historial y Buscador
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
               child: Row(
@@ -433,7 +428,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
               ),
             ),
 
-            // Campo de búsqueda en el historial
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: TextField(
@@ -460,7 +454,6 @@ class _TechnicalHomeScreenState extends State<TechnicalHomeScreen> {
             ),
             const SizedBox(height: 6),
 
-            // Lista de Inspecciones
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))

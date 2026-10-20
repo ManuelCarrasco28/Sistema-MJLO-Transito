@@ -174,7 +174,6 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 const SizedBox(height: 12),
 
                 if (widget.searchType == 'PLACA') ...[
-                  // Representación visual de placa vehicular
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                     decoration: BoxDecoration(
@@ -247,7 +246,6 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
 
                 const SizedBox(height: 16),
 
-                // Caja de recomendaciones para el usuario
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -294,7 +292,6 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
 
                 const SizedBox(height: 24),
 
-                // Botón principal: Volver a buscar con la placa pre-cargada
                 SizedBox(
                   width: double.infinity,
                   height: 50,
@@ -326,7 +323,6 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                 ),
                 const SizedBox(height: 8),
 
-                // Botón secundario: Volver al dashboard
                 TextButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.arrow_back, size: 16),

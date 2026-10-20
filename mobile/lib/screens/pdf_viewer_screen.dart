@@ -34,9 +34,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _cargarDocumentoPdf();
   }
 
-  /// Carga previamente todos los bytes en memoria.
-  /// Esto previene el lag/hipo ("JNI critical lock") durante el pinch-to-zoom
-  /// ya que el renderizador local no compite con peticiones HTTP por bloques.
   Future<void> _cargarDocumentoPdf() async {
     setState(() {
       _isLoading = true;
@@ -156,13 +153,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     CircularProgressIndicator(color: AppTheme.primaryBlue),
                     SizedBox(height: 16),
                     Text(
-                      'Cargando documento oficial CERTICAV...',
+                      'Cargando documento...',
                       style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'Optimizando visualización para zoom fluido',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
