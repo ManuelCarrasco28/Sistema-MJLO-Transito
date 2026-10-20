@@ -125,8 +125,8 @@ class PapeletasController extends ResourceController
                     p.firma_conductor_observacion as firmaConductorObservacion,
                     p.monto_total as montoTotal,
                     p.estado,
-                    CASE WHEN p.estado != 'ANULADA' AND TIMESTAMPDIFF(SECOND, p.fecha_modificacion, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar,
-                    GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, p.fecha_modificacion, NOW())) as segundosRestantesTolerancia,
+                    CASE WHEN p.estado != 'ANULADA' AND NOT EXISTS (SELECT 1 FROM reportes_intervencion ri WHERE ri.id_papeleta = p.id) AND TIMESTAMPDIFF(SECOND, p.fecha_modificacion, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar,
+                    CASE WHEN p.estado != 'ANULADA' AND NOT EXISTS (SELECT 1 FROM reportes_intervencion ri WHERE ri.id_papeleta = p.id) THEN GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, p.fecha_modificacion, NOW())) ELSE 0 END as segundosRestantesTolerancia,
                     
                     ret.id as retencionId,
                     ret.estado as retencionEstado
@@ -610,6 +610,12 @@ class PapeletasController extends ResourceController
             }
             if ($papeleta['estado'] === 'ANULADA') {
                 throw new \DomainException('La papeleta se encuentra anulada.');
+            }
+
+            // Validar que no provenga de un reporte de intervención gestionado por oficina
+            $esDeReporte = $db->query('SELECT 1 FROM reportes_intervencion WHERE id_papeleta=? LIMIT 1', [$id])->getRowArray();
+            if ($esDeReporte) {
+                throw new \DomainException('Esta infracción fue procesada por la administración y no puede ser modificada desde la aplicación.');
             }
 
             // Validar ventana de tolerancia de 5 minutos (300 segundos)

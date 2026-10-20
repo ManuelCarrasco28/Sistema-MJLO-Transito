@@ -754,79 +754,183 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
           tipoTexto = esReporte ? 'Informal (Reporte)' : 'Informal (Infracción)';
         }
 
-        final opName = data['operativoNombre'] != null && data['operativoNombre'].toString().isNotEmpty 
-            ? '\nOperativo: ${data['operativoNombre']}' 
-            : '';
-            
-        final montoText = esReporte ? '' : '\nMonto Total: S/ ${data['montoTotal'] ?? 0}';
+        final estadoDoc = (data['estado'] ?? '').toString().toUpperCase();
+        final bool esConvertido = estadoDoc == 'CONVERTIDO_PAPELETA' || (data['id_papeleta'] != null && data['id_papeleta'] != 0);
         final int segTolerancia = int.tryParse(data['segundosRestantesTolerancia']?.toString() ?? '') ?? 0;
-        final bool puedeEditar = (data['puedeEditar'] == true || data['puedeEditar'] == 1 || data['puedeEditar'] == '1') && segTolerancia > 0;
+        final bool puedeEditar = (data['puedeEditar'] == true || data['puedeEditar'] == 1 || data['puedeEditar'] == '1')
+            && segTolerancia > 0
+            && !esConvertido
+            && estadoDoc != 'ANULADA'
+            && estadoDoc != 'RECHAZADO';
 
         return Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: avatarBgColor)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: avatarBgColor, child: Icon(iconData, color: cardColor)),
-              title: Text('$tipoTexto - $numDoc', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: Column(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: avatarBgColor, width: 1.5),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _showDetails(context, data, isFormal, esReporte, identificador),
+            child: Padding(
+              padding: const EdgeInsets.all(13),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Vehículo: $identificador$montoText$opName'),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 19,
+                        backgroundColor: avatarBgColor,
+                        child: Icon(iconData, color: cardColor, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tipoTexto,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: cardColor,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            Text(
+                              numDoc,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14.5,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: cardColor.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: TextButton.icon(
+                          icon: Icon(Icons.visibility_rounded, size: 16, color: cardColor),
+                          label: Text('Ver', style: TextStyle(color: cardColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            visualDensity: VisualDensity.compact,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => _showDetails(context, data, isFormal, esReporte, identificador),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.directions_car_rounded, size: 14, color: Color(0xFF64748B)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Vehículo: $identificador',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!esReporte && data['montoTotal'] != null) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(Icons.payments_outlined, size: 14, color: Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Monto: S/ ${data['montoTotal']}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (data['operativoNombre'] != null && data['operativoNombre'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(Icons.shield_outlined, size: 14, color: Color(0xFF64748B)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Operativo: ${data['operativoNombre']}',
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                   if (puedeEditar) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(6),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFF8E1), Color(0xFFFFECB3)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFFFFB74D)),
                       ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.timer_outlined, size: 13, color: Color(0xFFE65100)),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Tolerancia activa: ${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')} para corregir',
-                            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFFBF360C)),
+                          const Icon(Icons.timer_outlined, size: 15, color: Color(0xFFE65100)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Tolerancia activa: ${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFBF360C),
+                              ),
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () => _abrirModificar(data, esReporte),
+                            icon: const Icon(Icons.edit_note_rounded, size: 16),
+                            label: const Text('Modificar', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE65100),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              visualDensity: VisualDensity.compact,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                ],
-              ),
-              isThreeLine: true,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (puedeEditar)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 4.0),
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.edit_note_rounded, size: 18),
-                        label: Text(
-                          '${(segTolerancia ~/ 60)}:${(segTolerancia % 60).toString().padLeft(2, '0')}',
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFBF360C),
-                          backgroundColor: const Color(0xFFFFF3E0),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFFFB74D))),
-                        ),
-                        onPressed: () => _abrirModificar(data, esReporte),
-                      ),
-                    ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.visibility, size: 18),
-                    label: const Text('Ver'),
-                    style: TextButton.styleFrom(foregroundColor: cardColor),
-                    onPressed: () => _showDetails(context, data, isFormal, esReporte, identificador),
-                  ),
                 ],
               ),
             ),

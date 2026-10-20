@@ -38,7 +38,7 @@ class ReportesIntervencionController extends ResourceController
                 COALESCE(NULLIF(TRIM(CONCAT(c_cond.nombres, ' ', c_cond.apellido_paterno, ' ', COALESCE(c_cond.apellido_materno, ''))), ''), r.conductor_informal_nombres, 'No identificado') as conductorNombre,
                 r.id_operativo as operativoId, COALESCE(op.nombre, '') as operativoNombre,
                 CASE WHEN r.estado = 'PENDIENTE' AND TIMESTAMPDIFF(SECOND, r.fecha_updated, NOW()) <= 300 THEN 1 ELSE 0 END as puedeEditar,
-                GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, r.fecha_updated, NOW())) as segundosRestantesTolerancia
+                CASE WHEN r.estado = 'PENDIENTE' THEN GREATEST(0, 300 - TIMESTAMPDIFF(SECOND, r.fecha_updated, NOW())) ELSE 0 END as segundosRestantesTolerancia
             ", false)
             ->join('vehiculos v', 'v.id = r.id_vehiculo', 'left')
             ->join('trabajadores t', 't.id_persona = r.id_inspector', 'left')
