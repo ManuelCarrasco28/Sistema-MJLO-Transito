@@ -1,7 +1,7 @@
 <#
   Ejecuta la app móvil apuntando al backend de TU PC.
 
-  Lee MOBILE_API_URL del archivo .env de la raíz del proyecto (el .env no se sube a GitHub: cada persona
+  Lee MOBILE_API_URL del archivo backend/.env del proyecto (el .env no se sube a GitHub: cada persona
   tiene el suyo, con la IP de su propia PC) y se la pasa a Flutter como --dart-define=API_URL=...
 
   Uso:
@@ -9,7 +9,7 @@
     .\run-dev.ps1 -d R58M123ABC       # cualquier argumento extra se pasa a flutter run
     .\run-dev.ps1 -MostrarSolo        # solo muestra el comando, no lo ejecuta
 
-  Si MOBILE_API_URL no existe en el .env, se usa el valor por defecto de la app (10.0.2.2, emulador de Android).
+  Si MOBILE_API_URL no existe en el .env, se usa el valor por defecto de la app (producción).
 #>
 param(
     [switch]$MostrarSolo,
@@ -18,7 +18,7 @@ param(
 )
 
 $raiz = Split-Path -Parent $PSScriptRoot
-$archivoEnv = Join-Path $raiz '.env'
+$archivoEnv = Join-Path $raiz 'backend\.env'
 $url = $null
 $clave = $null
 
@@ -39,7 +39,7 @@ if ($url) {
     Write-Host "Backend de la app: $url (de MOBILE_API_URL en .env)" -ForegroundColor Cyan
     $argumentos += "--dart-define=API_URL=$url"
 } else {
-    Write-Host 'MOBILE_API_URL no está en el .env: se usa la dirección por defecto de la app (10.0.2.2, emulador).' -ForegroundColor Yellow
+    Write-Host 'MOBILE_API_URL no está en el .env: se usa la dirección por defecto de la app (producción).' -ForegroundColor Yellow
 }
 if ($clave) { $argumentos += "--dart-define=MOBILE_KEY=$clave" }
 if ($ArgumentosFlutter) { $argumentos += $ArgumentosFlutter }
