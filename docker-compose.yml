@@ -4,7 +4,7 @@ services:
     image: mariadb:10.6
     container_name: mjlo_db
     restart: always
-    env_file: .env
+    env_file: ./backend/.env
     ports:
       - "127.0.0.1:3307:3306"
     volumes:
@@ -35,8 +35,7 @@ services:
       - backend_vendor:/var/www/html/vendor
       - backend_cache:/var/www/html/writable/cache
       - backend_session:/var/www/html/writable/session
-      - ./.env:/var/www/html/.env
-    env_file: .env
+    env_file: ./backend/.env
 
   frontend:
     build:
@@ -50,7 +49,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
-    env_file: .env
+    env_file: ./frontend/.env
 
   phpmyadmin:
     image: phpmyadmin:5.2
@@ -58,7 +57,7 @@ services:
     restart: always
     ports:
       - "127.0.0.1:8081:80"
-    env_file: .env
+    env_file: ./backend/.env
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
