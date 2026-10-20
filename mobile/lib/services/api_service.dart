@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint;
 
 /// Envuelve las llamadas autenticadas: si el servidor responde 401 la sesión venció (o la cerraron),
 /// se limpian las credenciales y se avisa a la app para volver al login en vez de mostrar errores sueltos.
@@ -15,8 +15,11 @@ class _ClienteAutenticado {
   Future<http.Response> get(Uri url, {Map<String, String>? headers}) async =>
       _revisar(await http.get(url, headers: headers));
 
-  Future<http.Response> post(Uri url, {Map<String, String>? headers, Object? body}) async =>
-      _revisar(await http.post(url, headers: headers, body: body));
+  Future<http.Response> post(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+  }) async => _revisar(await http.post(url, headers: headers, body: body));
 
   Future<http.Response> put(Uri url, {Map<String, String>? headers, Object? body}) async =>
       _revisar(await http.put(url, headers: headers, body: body));
@@ -49,9 +52,9 @@ class ApiService {
   static const _keyPasswordRecordado = 'password_recordado_login';
 
   // Configuración de URL del Backend:
-  // 1. Emulador Android local: 10.0.2.2 apunta a tu PC.
-  // 2. Celular físico / Wi-Fi: ejecutar con --dart-define=API_URL=http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'http://10.237.155.109:8080/api'; // Conexión local a Docker / IP de red local
+  // Por defecto apunta a producción. Para probar contra tu PC:
+  // emulador Android --dart-define=API_URL=http://10.0.2.2:8080/api; celular físico: http://IP_DE_TU_PC:8080/api
+  static const String _defaultUrl = 'https://transito.munijlo.gob.pe/api/v1'; // Producción; para probar en local usar --dart-define=API_URL
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -59,9 +62,7 @@ class ApiService {
     defaultValue: _defaultUrl,
   );
 
-  static const String baseUrl = kIsWeb
-      ? 'http://127.0.0.1:8080/api'
-      : _configuredUrl;
+  static const String baseUrl = _configuredUrl;
   static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
 
@@ -131,8 +132,12 @@ class ApiService {
           : null,
     };
   }
+
   // Métodos de compatibilidad
-  static Future<void> saveSavedCredentials(String username, String password) async {
+  static Future<void> saveSavedCredentials(
+    String username,
+    String password,
+  ) async {
     await registrarLoginExitoso(username, password, true);
   }
 
@@ -167,10 +172,11 @@ class ApiService {
 
   /// Encabezados para cargar fotos y firmas: el servidor las entrega solo con sesión iniciada.
   static Map<String, String> get headersImagen => {
-        'X-Mobile-App': 'MJLO-TRANSITO',
-        if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
-        if (_cookieEnMemoria != null && _cookieEnMemoria!.isNotEmpty) 'Cookie': _cookieEnMemoria!,
-      };
+    'X-Mobile-App': 'MJLO-TRANSITO',
+    if (_mobileKey.isNotEmpty) 'X-Mobile-Key': _mobileKey,
+    if (_cookieEnMemoria != null && _cookieEnMemoria!.isNotEmpty)
+      'Cookie': _cookieEnMemoria!,
+  };
 
   /// URL de un archivo guardado en el servidor (foto, firma). Acepta la ruta relativa ('papeletas/abc.jpg')
   /// o la URL completa que arma el servidor, y siempre apunta al servidor que usa la app.
@@ -178,7 +184,9 @@ class ApiService {
     final r = ruta.trim();
     if (r.startsWith('data:')) return r;
     final i = r.indexOf('/api/files/');
-    if (i >= 0) return '$baseUrl/files/${r.substring(i + '/api/files/'.length)}';
+    if (i >= 0) {
+      return '$baseUrl/files/${r.substring(i + '/api/files/'.length)}';
+    }
     if (r.startsWith('http://') || r.startsWith('https://')) return r;
     return '$baseUrl/files/${r.replaceFirst(RegExp(r'^/+'), '')}';
   }
@@ -220,7 +228,10 @@ class ApiService {
         if (rawCookie != null) {
           final match = RegExp(r'session_user=[^;]+').firstMatch(rawCookie);
           if (match != null) {
-            await _secureStorage.write(key: _sessionCookieKey, value: match.group(0)!);
+            await _secureStorage.write(
+              key: _sessionCookieKey,
+              value: match.group(0)!,
+            );
             _cookieEnMemoria = match.group(0)!;
           }
         }
@@ -379,13 +390,11 @@ class ApiService {
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-    final uri = Uri.parse('$baseUrl/papeletas').replace(queryParameters: params);
+    final uri = Uri.parse('$baseUrl/papeletas')
+        .replace(queryParameters: params);
 
     final response = await _http
-        .get(
-          uri,
-          headers: await _getHeaders(isJson: false),
-        )
+        .get(uri, headers: await _getHeaders(isJson: false))
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -404,13 +413,11 @@ class ApiService {
     }
     if (dni != null) params['dni'] = dni;
     if (placa != null) params['placa'] = placa;
-    final uri = Uri.parse('$baseUrl/reportes-intervencion').replace(queryParameters: params);
+    final uri = Uri.parse('$baseUrl/reportes-intervencion')
+        .replace(queryParameters: params);
 
     final response = await _http
-        .get(
-          uri,
-          headers: await _getHeaders(isJson: false),
-        )
+        .get(uri, headers: await _getHeaders(isJson: false))
         .timeout(_requestTimeout);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -613,9 +620,8 @@ class ApiService {
       qParams['codeOficina'] = codeOficina;
     }
 
-    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar').replace(
-      queryParameters: qParams,
-    );
+    final uri = Uri.parse('$baseUrl/mobile/vehiculos/buscar')
+        .replace(queryParameters: qParams);
     final response = await _http
         .get(
           uri,

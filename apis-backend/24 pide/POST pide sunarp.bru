@@ -1,0 +1,19 @@
+meta {
+  name: POST pide sunarp
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/pide/sunarp
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "placa": "{{placa}}",
+    "codeZona": "11",
+    "codeOficina": "01"
+  }
+}

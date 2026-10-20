@@ -61,7 +61,8 @@ flowchart LR
 Requisitos: [Docker Desktop](https://www.docker.com/products/docker-desktop/) y Git.
 
 ```bash
-cp .env.example .env        # completa las claves; no subas el .env
+cp backend/.env.example backend/.env      # completa las claves
+cp frontend/.env.example frontend/.env    # no subas ningún .env
 docker compose up -d
 docker exec mjlo_backend php spark migrate
 docker exec mjlo_backend php spark db:seed UsuariosSeeder
@@ -88,7 +89,7 @@ docker exec mjlo_backend vendor/bin/phpunit        # pruebas del backend
 cd frontend && npx vitest run                      # pruebas del frontend
 ```
 
-**App móvil:** pon la IP de tu PC en `MOBILE_API_URL` del `.env` y ejecuta `mobile/run-dev.ps1` (Windows) o `mobile/run-dev.sh`. Sin esa variable usa `10.0.2.2` (emulador Android).
+**App móvil:** pon la IP de tu PC en `MOBILE_API_URL` de `backend/.env` y ejecuta `mobile/run-dev.ps1` (Windows) o `mobile/run-dev.sh`. Sin esa variable usa `10.0.2.2` (emulador Android).
 
 ## Notas
 

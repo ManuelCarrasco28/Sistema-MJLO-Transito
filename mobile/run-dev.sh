@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ejecuta la app móvil apuntando al backend de TU PC (Linux / macOS / Git Bash).
 #
-# Lee MOBILE_API_URL del .env de la raíz del proyecto (cada persona tiene el suyo, con la IP de su PC; el .env
+# Lee MOBILE_API_URL del backend/.env del proyecto (cada persona tiene el suyo, con la IP de su PC; el .env
 # no se sube a GitHub) y se la pasa a Flutter como --dart-define=API_URL=...
 #
 # Uso:  ./run-dev.sh            -> flutter run con la IP del .env
@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-ENV_FILE="../.env"
+ENV_FILE="../backend/.env"
 URL=""
 if [ -f "$ENV_FILE" ]; then
   URL="$(grep -E '^[[:space:]]*MOBILE_API_URL[[:space:]]*=' "$ENV_FILE" | head -n1 | sed -E 's/^[[:space:]]*MOBILE_API_URL[[:space:]]*=[[:space:]]*//' | tr -d '"'"'"'\r' || true)"
@@ -27,7 +27,7 @@ if [ -n "$URL" ]; then
   echo "Backend de la app: $URL (de MOBILE_API_URL en .env)"
   ARGS+=("--dart-define=API_URL=$URL")
 else
-  echo "MOBILE_API_URL no está en el .env: se usa la dirección por defecto de la app (10.0.2.2, emulador)."
+  echo "MOBILE_API_URL no está en el .env: se usa la dirección por defecto de la app (producción)."
 fi
 [ -n "$KEY" ] && ARGS+=("--dart-define=MOBILE_KEY=$KEY")
 ARGS+=("$@")
