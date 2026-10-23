@@ -68,9 +68,12 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
 
   Future<void> _loadHistory() async {
     try {
+      final bool esConsultaVehiculo = widget.filterDni != null || widget.filterPlaca != null;
+      final int? idInspector = esConsultaVehiculo ? null : await ApiService.getPersonalId();
+
       final papeletasFuture = ApiService.getPapeletas(dni: widget.filterDni, placa: widget.filterPlaca);
       final reportesFuture = ApiService.getReportes(dni: widget.filterDni, placa: widget.filterPlaca);
-      final operativosFuture = ApiService.getOperativos();
+      final operativosFuture = ApiService.getOperativos(inspectorId: idInspector);
 
       final results = await Future.wait([papeletasFuture, reportesFuture, operativosFuture]);
       final papeletas = results[0];
@@ -121,7 +124,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
           for (var o in operativosApi) (o['id']?.toString() ?? ''): Map<String, dynamic>.from(o)
         };
 
-        if (widget.filterDni != null || widget.filterPlaca != null) {
+        if (esConsultaVehiculo) {
           for (var opId in opsMap.keys) {
             if (mapOperativosApi.containsKey(opId)) {
               listaOperativosFinal.add(mapOperativosApi[opId]!);
@@ -130,8 +133,14 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
             }
           }
         } else {
+          // Historial del inspector: solo los operativos donde participa o participó
           for (var o in operativosApi) {
             listaOperativosFinal.add(Map<String, dynamic>.from(o));
+          }
+          for (var opId in opsMap.keys) {
+            if (!mapOperativosApi.containsKey(opId)) {
+              listaOperativosFinal.add(opsMap[opId]!);
+            }
           }
         }
       } else {

@@ -908,27 +908,29 @@ class _DepotHomeScreenState extends State<DepotHomeScreen> {
                         onTap: _abrirPerfil,
                         borderRadius: BorderRadius.circular(24),
                         child: CircleAvatar(
-                          radius: 22,
+                          radius: 20,
                           backgroundColor: Colors.white.withOpacity(0.2),
-                          child: const Icon(Icons.security, color: Colors.white, size: 24),
+                          child: const Icon(Icons.security, color: Colors.white, size: 22),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: InkWell(
                           onTap: _abrirPerfil,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 _encargadoNombre.toUpperCase(),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                  fontSize: 13.5,
+                                  height: 1.15,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                softWrap: true,
+                                maxLines: 2,
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -936,29 +938,43 @@ class _DepotHomeScreenState extends State<DepotHomeScreen> {
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.85),
                                   fontSize: 11,
-                                  letterSpacing: 0.4,
+                                  height: 1.15,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                softWrap: true,
+                                maxLines: 2,
                               ),
                             ],
                           ),
                         ),
                       ),
-                      IconButton(
-                        onPressed: _abrirPerfil,
-                        icon: const Icon(Icons.badge_outlined, color: Colors.white),
-                        tooltip: 'Ver mi perfil',
-                      ),
-                      IconButton(
-                        onPressed: _cargarDatos,
-                        icon: const Icon(Icons.refresh, color: Colors.white),
-                        tooltip: 'Actualizar',
-                      ),
-                      IconButton(
-                        onPressed: _cerrarSesion,
-                        icon: const Icon(Icons.logout, color: Colors.white70),
-                        tooltip: 'Cerrar sesión',
+                      const SizedBox(width: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: _abrirPerfil,
+                            icon: const Icon(Icons.badge_outlined, color: Colors.white, size: 21),
+                            tooltip: 'Ver mi perfil',
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: const EdgeInsets.all(4),
+                          ),
+                          const SizedBox(width: 2),
+                          IconButton(
+                            onPressed: _cargarDatos,
+                            icon: const Icon(Icons.refresh, color: Colors.white, size: 21),
+                            tooltip: 'Actualizar',
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: const EdgeInsets.all(4),
+                          ),
+                          const SizedBox(width: 2),
+                          IconButton(
+                            onPressed: _cerrarSesion,
+                            icon: const Icon(Icons.logout, color: Colors.white70, size: 21),
+                            tooltip: 'Cerrar sesión',
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: const EdgeInsets.all(4),
+                          ),
+                        ],
                       ),
                     ],
                   ),

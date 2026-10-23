@@ -299,6 +299,15 @@ class OperativosController extends ResourceController
             $builder->where('o.fecha >=', date('Y-m-d', strtotime('-7 days')));
         }
 
+        $inspectorId = (int) ($this->request->getGet('inspector_id') ?: $this->request->getGet('id_inspector') ?: 0);
+        if ($inspectorId > 0) {
+            $builder->where("(
+                EXISTS (SELECT 1 FROM operativo_inspectores oi_sub WHERE oi_sub.id_operativo = o.id AND oi_sub.id_inspector = {$inspectorId})
+                OR EXISTS (SELECT 1 FROM papeletas p_sub WHERE p_sub.id_operativo = o.id AND p_sub.id_inspector = {$inspectorId})
+                OR EXISTS (SELECT 1 FROM reportes_intervencion r_sub WHERE r_sub.id_operativo = o.id AND r_sub.id_inspector = {$inspectorId})
+            )", null, false);
+        }
+
         $page = (int)$this->request->getGet('page');
         $porPagina = max(1, min(200, (int)($this->request->getGet('porPagina') ?: 20)));
 
@@ -317,6 +326,13 @@ class OperativosController extends ResourceController
             if ($estado !== '' && $estado !== 'TODOS') $conteo->where('o.estado', $estado);
             if ($fechaFiltro === 'HOY') $conteo->where('o.fecha', date('Y-m-d'));
             elseif ($fechaFiltro === 'SEMANA') $conteo->where('o.fecha >=', date('Y-m-d', strtotime('-7 days')));
+            if ($inspectorId > 0) {
+                $conteo->where("(
+                    EXISTS (SELECT 1 FROM operativo_inspectores oi_sub WHERE oi_sub.id_operativo = o.id AND oi_sub.id_inspector = {$inspectorId})
+                    OR EXISTS (SELECT 1 FROM papeletas p_sub WHERE p_sub.id_operativo = o.id AND p_sub.id_inspector = {$inspectorId})
+                    OR EXISTS (SELECT 1 FROM reportes_intervencion r_sub WHERE r_sub.id_operativo = o.id AND r_sub.id_inspector = {$inspectorId})
+                )", null, false);
+            }
             $total = $conteo->countAllResults();
 
             $columnasOrdenables = [

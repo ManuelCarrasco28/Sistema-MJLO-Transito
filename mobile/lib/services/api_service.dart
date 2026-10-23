@@ -495,11 +495,18 @@ class ApiService {
     return null;
   }
 
-  static Future<List<dynamic>> getOperativos() async {
+  static Future<List<dynamic>> getOperativos({int? inspectorId}) async {
     try {
+      final Map<String, dynamic> params = {};
+      if (inspectorId != null && inspectorId > 0) {
+        params['inspector_id'] = inspectorId.toString();
+      }
+      final uri = Uri.parse('$baseUrl/operativos').replace(
+        queryParameters: params.isNotEmpty ? params : null,
+      );
       final response = await _http
           .get(
-            Uri.parse('$baseUrl/operativos'),
+            uri,
             headers: await _getHeaders(isJson: false),
           )
           .timeout(_requestTimeout);

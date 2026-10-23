@@ -681,27 +681,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               },
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.badge_outlined, color: Colors.white),
-            tooltip: 'Ver perfil del inspector',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const InspectorProfileScreen(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            tooltip: 'Configuración',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
+          const SizedBox(width: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.badge_outlined, color: Colors.white, size: 21),
+                tooltip: 'Ver perfil del inspector',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: const EdgeInsets.all(4),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const InspectorProfileScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 2),
+              IconButton(
+                icon: const Icon(Icons.settings, color: Colors.white, size: 21),
+                tooltip: 'Configuración',
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: const EdgeInsets.all(4),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
