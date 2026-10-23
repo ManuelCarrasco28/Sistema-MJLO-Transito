@@ -315,10 +315,32 @@ export function Vehiculos({ user }) {
         method: 'POST',
         body: personaFormData,
       })
-      const resData = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(resData.messages?.error || resData.message || 'Error al registrar la persona.')
+        const errorMsg = await leerMensajeError(res, 'No se pudo registrar la persona.')
+        const numDoc = (personaFormData.numeroDocumento || '').trim()
+        if (numDoc && (errorMsg.toLowerCase().includes('ya existe') || errorMsg.toLowerCase().includes('registrada') || res.status === 400 || res.status === 409)) {
+          try {
+            const resBusq = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(numDoc)}&porPagina=5`)
+            if (resBusq.ok) {
+              const payloadBusq = await resBusq.json()
+              const encontrada = (payloadBusq.data || []).find(p => (p.numeroDocumento || p.numero || '').trim() === numDoc)
+              if (encontrada) {
+                selectPropietario(encontrada)
+                setTitularDetectado({
+                  nombre: getPersonaNombre(encontrada),
+                  documento: numDoc,
+                  matchedPersona: encontrada,
+                })
+                setIsPersonaModalOpen(false)
+                showToast('La persona ya se encontraba registrada y fue asignada como propietario.')
+                return
+              }
+            }
+          } catch { /* continuar lanzando error legible */ }
+        }
+        throw new Error(errorMsg)
       }
+      const resData = await res.json().catch(() => ({}))
       const newPersona = resData.data || { ...personaFormData, id: Date.now() }
       const standardizedPersona = {
         ...newPersona,
@@ -339,7 +361,7 @@ export function Vehiculos({ user }) {
       setIsPersonaModalOpen(false)
       showToast('Persona registrada y asignada como propietario.')
     } catch (err) {
-      showError('Error', sanitizarMensaje(err.message, 'No se pudo guardar la persona.'))
+      showError('No se pudo registrar la persona', err.message || 'Error al guardar los datos de la persona.')
     }
   }
 
@@ -592,6 +614,21 @@ export function Vehiculos({ user }) {
 
     setIsBuscandoSunarpModal(true)
     try {
+      if (!isEditing) {
+        try {
+          const checkRes = await apiFetch(`/vehiculos?page=1&buscar=${encodeURIComponent(plate)}&porPagina=5`)
+          if (checkRes.ok) {
+            const checkData = await checkRes.json()
+            const yaExiste = (checkData.data || []).find(v => (v.placa || '').toUpperCase() === plate)
+            if (yaExiste) {
+              showWarning('Vehículo Ya Registrado', `El vehículo con placa ${plate} ya se encuentra registrado en el padrón municipal. Puede buscarlo en el listado para revisar o actualizar sus datos.`)
+              setIsBuscandoSunarpModal(false)
+              return
+            }
+          }
+        } catch { /* continuar con búsqueda sunarp */ }
+      }
+
       const response = await apiFetch('/pide/sunarp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -599,8 +636,7 @@ export function Vehiculos({ user }) {
       })
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.messages?.error || errData.message || 'No se pudo consultar la información del vehículo.')
+        throw new Error(await leerMensajeError(response, 'No se pudo consultar la información del vehículo en SUNARP.'))
       }
 
       const res = await response.json()
@@ -828,12 +864,7 @@ export function Vehiculos({ user }) {
     setShowPropietarioResults(false)
     setAsociacionSearch(isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '')
     setShowAsociacionResults(false)
-    const matchedOwner = vehiculo.propietarioDni ? (personas || []).find(p => p.numeroDocumento === vehiculo.propietarioDni) : null
-    setTitularDetectado(vehiculo.propietario ? {
-      nombre: vehiculo.propietario,
-      documento: vehiculo.propietarioDni || '',
-      matchedPersona: matchedOwner,
-    } : null)
+    setTitularDetectado(null)
     setFormData({
       ...vehiculo,
       asociacion: isVehiculoFormal(vehiculo) ? (vehiculo.asociacion || '') : '',
@@ -894,8 +925,7 @@ export function Vehiculos({ user }) {
           method: 'PUT',
           body: formData,
         })
-        const resData = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(resData.messages?.error || resData.message || 'No se pudo actualizar el vehículo.')
+        if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo actualizar el vehículo.'))
         loadVehiculos()
         loadStats()
         showToast('Vehículo actualizado correctamente', 'editar')
@@ -904,8 +934,9 @@ export function Vehiculos({ user }) {
           method: 'POST',
           body: formData,
         })
+        if (!res.ok) throw new Error(await leerMensajeError(res, 'No se pudo registrar el vehículo.'))
         const resData = await res.json().catch(() => ({}))
-        if (!res.ok || !resData.data?.id) throw new Error(resData.messages?.error || resData.message || 'No se pudo registrar el vehículo.')
+        if (!resData.data?.id) throw new Error('No se pudo confirmar el identificador del vehículo registrado.')
         setCurrentPage(1)
         loadVehiculos()
         loadStats()
@@ -913,7 +944,7 @@ export function Vehiculos({ user }) {
       }
       setIsModalOpen(false)
     } catch (err) {
-      showError('Error', sanitizarMensaje(err.message, 'Error al guardar el vehículo en el servidor.'))
+      showError('No se pudo guardar el vehículo', err.message || 'Error al guardar el vehículo en el servidor.')
     }
   }
 

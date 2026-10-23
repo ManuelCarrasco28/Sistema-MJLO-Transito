@@ -558,7 +558,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
           _buildSectionTitle('Estado de Documentos', Icons.verified_user),
           Builder(
             builder: (context) {
-              final isUnregistered = (_vehicleData!['id'] == 0 || _vehicleData!['id'] == '0' || _vehicleData!['formalidad'] == 'INFORMAL');
+              final rawId = _vehicleData!['id'];
+              final isUnregistered = (rawId == null || rawId == 0 || rawId == '0');
               
               if (isUnregistered && _documents.isEmpty) {
                 return Container(
@@ -574,9 +575,44 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                       Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 48),
                       const SizedBox(height: 12),
                       const Text(
-                        'Vehículo no registrado en la municipalidad de JLO',
+                        'Vehículo no registrado en el padrón municipal',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Esta unidad no figura en la base de datos de la municipalidad de JLO.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (_documents.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.amber.shade300),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 44),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Sin permisos de transporte registrados',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'El vehículo se encuentra registrado en el padrón municipal como servicio particular / no asociado.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.amber.shade900, fontSize: 13),
                       ),
                     ],
                   ),

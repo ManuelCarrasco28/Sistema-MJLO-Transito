@@ -154,6 +154,22 @@ export function PersonaRapidaModal({
 
       if (!response.ok) {
         const msg = await leerMensajeError(response, 'No se pudo registrar la persona.')
+        const numDoc = (payload.numeroDocumento || '').trim()
+        if (numDoc && (msg.toLowerCase().includes('ya existe') || msg.toLowerCase().includes('registrada') || response.status === 400 || response.status === 409)) {
+          try {
+            const resBusq = await apiFetch(`/personas?page=1&buscar=${encodeURIComponent(numDoc)}&porPagina=5`)
+            if (resBusq.ok) {
+              const payloadBusq = await resBusq.json()
+              const encontrada = (payloadBusq.data || []).find(p => (p.numeroDocumento || p.numero || '').trim() === numDoc)
+              if (encontrada) {
+                showToast('La persona ya se encontraba registrada y fue seleccionada.')
+                onPersonaCreada?.(encontrada)
+                onClose?.()
+                return
+              }
+            }
+          } catch { /* continuar con error legible */ }
+        }
         throw new Error(msg)
       }
 

@@ -427,7 +427,7 @@ class PersonasController extends ResourceController
             $consulta = $db->table('personas')->where('numero', $documento);
             if ($id !== null) $consulta->where('id !=', $id);
             if ($consulta->countAllResults() > 0) {
-                $errores['numeroDocumento'] = 'Documento duplicado.';
+                $errores['numeroDocumento'] = 'Ya existe una persona registrada con este número de documento.';
             }
         }
         $licencia = strtoupper(trim((string)($input['numeroLicencia'] ?? '')));
@@ -435,7 +435,7 @@ class PersonasController extends ResourceController
             $consulta = $db->table('ciudadanos')->where('numero_licencia', $licencia);
             if ($id !== null) $consulta->where('id_persona !=', $id);
             if ($consulta->countAllResults() > 0) {
-                $errores['numeroLicencia'] = 'Licencia duplicada.';
+                $errores['numeroLicencia'] = 'Ya existe una persona registrada con este número de licencia de conducir.';
             }
         }
         return $errores;

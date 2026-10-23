@@ -836,9 +836,11 @@ class _RegisterAlienVehicleScreenState
   }
 
   Widget _buildVehicleSummaryCard() {
+    final rawId = _vehiculoData?['id'];
+    final isEnPadron = (rawId != null && rawId != 0 && rawId != '0');
     final isFormal = _vehiculoData?['asociacion'] != null;
-    final estadoTexto = isFormal ? 'FORMAL' : 'INFORMAL';
-    final estadoColor = isFormal ? Colors.blueAccent : Colors.redAccent;
+    final estadoTexto = !isEnPadron ? 'NO REGISTRADO' : (isFormal ? 'FORMAL' : 'INFORMAL');
+    final estadoColor = !isEnPadron ? Colors.redAccent : (isFormal ? Colors.blueAccent : Colors.amberAccent);
     final expectedDocs = ['TARJETA_OPERATIVIDAD', 'TARJETA_PROPIEDAD', 'SOAT', 'CERTICAV'];
     final List<dynamic> allDocs = List.from(_vehiculoData?['documentosVehiculo'] ?? _vehiculoData?['documentos'] ?? []);
 
@@ -913,7 +915,7 @@ class _RegisterAlienVehicleScreenState
               ],
             ),
             const SizedBox(height: 16),
-            if (!isFormal)
+            if (!isEnPadron)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 16),
@@ -928,10 +930,36 @@ class _RegisterAlienVehicleScreenState
                     Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
                     const SizedBox(height: 8),
                     Text(
-                      'Vehículo no registrado en la municipalidad de JLO',
+                      'Vehículo no registrado en el padrón municipal de JLO',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.red.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (!isFormal)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade300),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 28),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Unidad registrada en el padrón municipal como servicio particular / no asociado',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.amber.shade900,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),

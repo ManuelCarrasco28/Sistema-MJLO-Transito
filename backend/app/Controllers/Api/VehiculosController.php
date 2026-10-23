@@ -628,19 +628,19 @@ class VehiculosController extends ResourceController
 
         $placa = \App\Libraries\Placa::normalizar($input['placa']);
         if ($db->table('vehiculos')->where('placa', $placa)->countAllResults() > 0) {
-            return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
+            return $this->failValidationErrors('El vehículo con placa ' . $placa . ' ya se encuentra registrado en el sistema.');
         }
 
         if (isset($input['anio']) && $input['anio'] !== '' && (!filter_var($input['anio'], FILTER_VALIDATE_INT) || (int)$input['anio'] < 1900 || (int)$input['anio'] > (int)date('Y') + 1)) {
-            return $this->failValidationErrors('Año de fabricación no válido.');
+            return $this->failValidationErrors('El año de fabricación no es válido.');
         }
         if (isset($input['estado']) && !in_array(strtoupper(trim($input['estado'])), ['ACTIVO', 'INACTIVO'], true)) {
-            return $this->failValidationErrors('Estado de vehículo no válido.');
+            return $this->failValidationErrors('El estado del vehículo debe ser Activo o Inactivo.');
         }
         $tipoNombre = !empty($input['tipo']) ? trim($input['tipo']) : 'Mototaxi';
         $tipoRow = $db->table('tipos_vehiculo')->where('nombre', $tipoNombre)->get()->getRowArray();
         if (!$tipoRow) {
-            return $this->failValidationErrors('Seleccione un tipo de vehículo registrado.');
+            return $this->failValidationErrors('Seleccione un tipo de vehículo válido de la lista.');
         } else {
             $tipoVehiculoId = $tipoRow['id'];
         }
@@ -679,7 +679,7 @@ class VehiculosController extends ResourceController
 
         $personaRow = $db->table('personas')->where('numero', $propietarioDni)->get()->getRowArray();
         if (!$personaRow) {
-            return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
+            return $this->failValidationErrors('El propietario indicado con documento ' . $propietarioDni . ' no está registrado. Regístrelo en Personas o selecciónelo de la lista.');
         }
         $personaId = (int)$personaRow['id'];
 
@@ -760,10 +760,10 @@ class VehiculosController extends ResourceController
         }
         $propietarioDni = trim($input['propietarioDni'] ?? '');
         if ($propietarioDni !== '' && !$db->table('personas')->where('numero', $propietarioDni)->countAllResults()) {
-            return $this->failValidationErrors('El propietario no existe. Regístrelo primero en el módulo Personas.');
+            return $this->failValidationErrors('El propietario indicado con documento ' . $propietarioDni . ' no está registrado. Regístrelo en Personas o selecciónelo de la lista.');
         }
         if (!empty($input['tipo']) && !$db->table('tipos_vehiculo')->where('nombre', trim($input['tipo']))->countAllResults()) {
-            return $this->failValidationErrors('Seleccione un tipo de vehículo registrado.');
+            return $this->failValidationErrors('Seleccione un tipo de vehículo válido de la lista.');
         }
 
         $db->transException(true)->transBegin();
@@ -786,7 +786,7 @@ class VehiculosController extends ResourceController
                     }
                     if ($db->table('vehiculos')->where('placa', $placa)->where('id !=', $id)->countAllResults() > 0) {
                         $db->transRollback();
-                        return $this->failValidationErrors('La placa del vehículo ya se encuentra registrada en el sistema.');
+                        return $this->failValidationErrors('El vehículo con placa ' . $placa . ' ya se encuentra registrado en el sistema.');
                     }
                 }
                 $record['placa'] = $placa;
