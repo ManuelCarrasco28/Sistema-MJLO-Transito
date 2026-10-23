@@ -52,9 +52,8 @@ class ApiService {
   static const _keyPasswordRecordado = 'password_recordado_login';
 
   // Configuración de URL del Backend:
-  // Por defecto apunta a producción. Para probar contra tu PC:
-  // emulador Android --dart-define=API_URL=http://10.0.2.2:8080/api; celular físico: http://IP_DE_TU_PC:8080/api
-  static const String _defaultUrl = 'https://transito.munijlo.gob.pe/api/v1'; // Producción; para probar en local usar --dart-define=API_URL
+  // Por defecto apunta al endpoint de producción oficial:
+  static const String _defaultUrl = 'https://transito.munijlo.gob.pe/api/v1';
   // Clave compartida con el backend (app.mobileKey): se pasa con --dart-define=MOBILE_KEY=... y no queda en el código.
   static const String _mobileKey = String.fromEnvironment('MOBILE_KEY');
   static const String _configuredUrl = String.fromEnvironment(
@@ -62,8 +61,22 @@ class ApiService {
     defaultValue: _defaultUrl,
   );
 
-  static const String baseUrl = _configuredUrl;
-  static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api/?$'), '');
+  static String get baseUrl {
+    var url = _configuredUrl.trim();
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    // Si apunta al dominio oficial y no tiene el sufijo /v1, normalizar automáticamente
+    if (url.contains('transito.munijlo.gob.pe') && !url.contains('/api/v1')) {
+      if (url.endsWith('/api')) {
+        url = '$url/v1';
+      } else if (!url.contains('/api')) {
+        url = '$url/api/v1';
+      }
+    }
+    return url;
+  }
+  static String get fileBaseUrl => baseUrl.replaceAll(RegExp(r'/api(/v1)?/?$'), '');
   static const Duration _requestTimeout = Duration(seconds: 20);
 
   // --- GESTIÓN DE RECORDAR SESIÓN ---
@@ -375,6 +388,18 @@ class ApiService {
     final cargo = (prefs.getString('cargo') ?? '').toUpperCase();
     final tipo = (prefs.getString('tipo_inspector') ?? '').toUpperCase();
     return cargo.contains('TÉCNICO') || cargo.contains('TECNICO') || tipo == 'TECNICO';
+  }
+
+  static Future<bool> esEncargadoDeposito() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rol = (prefs.getString('rol') ?? '').toUpperCase();
+    final cargo = (prefs.getString('cargo') ?? '').toUpperCase();
+    final tipo = (prefs.getString('tipo_inspector') ?? '').toUpperCase();
+    return rol.contains('DEPÓSITO') ||
+        rol.contains('DEPOSITO') ||
+        cargo.contains('DEPÓSITO') ||
+        cargo.contains('DEPOSITO') ||
+        tipo == 'DEPOSITO';
   }
 
   static Future<List<dynamic>> getPapeletas({
@@ -876,5 +901,99 @@ class ApiService {
       }
     }
     return [];
+  }
+
+  /// Obtiene la lista paginada y filtrada de internamientos vehiculares
+  static Future<Map<String, dynamic>> getInternamientos({
+    String? buscar,
+    String? estado,
+    int page = 1,
+    int porPagina = 20,
+  }) async {
+    final Map<String, String> params = {
+      'page': page.toString(),
+      'porPagina': porPagina.toString(),
+    };
+    if (buscar != null && buscar.trim().isNotEmpty) {
+      params['buscar'] = buscar.trim();
+    }
+    if (estado != null && estado.isNotEmpty && estado != 'TODOS') {
+      params['estado'] = estado;
+    }
+
+    final uri = Uri.parse('$baseUrl/internamientos').replace(queryParameters: params);
+    final response = await _send(() async => _http.get(uri, headers: await _getHeaders()));
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return {
+        'data': json['data'] is List ? List<Map<String, dynamic>>.from(json['data']) : <Map<String, dynamic>>[],
+        'meta': json['meta'] is Map ? Map<String, dynamic>.from(json['meta']) : <String, dynamic>{},
+      };
+    }
+    throw Exception(_extractError(response.body, 'Error al cargar internamientos'));
+  }
+
+  /// Obtiene los contadores estadísticos de internamientos
+  static Future<Map<String, dynamic>> getInternamientoEstadisticas() async {
+    final uri = Uri.parse('$baseUrl/internamientos/estadisticas');
+    final response = await _send(() async => _http.get(uri, headers: await _getHeaders()));
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      if (json['data'] is Map) {
+        return Map<String, dynamic>.from(json['data']);
+      }
+    }
+    return {
+      'total': 0,
+      'enDeposito': 0,
+      'liberados': 0,
+      'avgDias': 0,
+    };
+  }
+
+  /// Obtiene el catálogo de criterios de inventario vehicular para el depósito
+  static Future<List<Map<String, dynamic>>> getInventarioCriterios() async {
+    final uri = Uri.parse('$baseUrl/inventario-criterios');
+    final response = await _send(() async => _http.get(uri, headers: await _getHeaders()));
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      if (json['data'] is List) {
+        return List<Map<String, dynamic>>.from(json['data']);
+      }
+    }
+    return [];
+  }
+
+  /// Actualiza observaciones, interesado e inventario de un internamiento
+  static Future<Map<String, dynamic>> actualizarInternamiento(
+    dynamic idOrUuid,
+    Map<String, dynamic> data,
+  ) async {
+    final uri = Uri.parse('$baseUrl/internamientos/$idOrUuid');
+    final response = await _send(
+      () async => _http.put(
+        uri,
+        headers: await _getHeaders(),
+        body: jsonEncode(data),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(_extractError(response.body, 'Error al actualizar internamiento'));
+  }
+
+  /// Retorna la URL oficial para previsualizar y descargar la Boleta de Internamiento
+  static String getBoletaPdfUrl(dynamic idOrUuid) {
+    return '$baseUrl/internamientos/$idOrUuid/pdf';
+  }
+
+  /// Retorna la URL oficial para previsualizar y descargar la Orden de Libertad
+  static String getLibertadPdfUrl(dynamic idOrUuid) {
+    return '$baseUrl/internamientos/$idOrUuid/pdf-libertad';
   }
 }

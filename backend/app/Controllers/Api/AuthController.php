@@ -61,7 +61,20 @@ class AuthController extends ResourceController
             'direccion'       => $userRecord['direccion'] ?? '',
             'tipo_contrato'   => $userRecord['tipo_contrato'] ?? '',
             'id_persona'      => (int) $userRecord['id_persona'],
-            'tipo_inspector'  => (strcasecmp((string) $userRecord['rol'], 'Inspector Técnico') === 0 || str_contains(strtoupper((string) ($userRecord['cargo'] ?? '')), 'TÉCNICO')) ? 'TECNICO' : ((strcasecmp((string) $userRecord['rol'], 'Inspector de Tránsito') === 0 || strcasecmp((string) $userRecord['rol'], 'Trabajador') === 0) ? 'TRANSITO' : null),
+            'tipo_inspector'  => (function () use ($userRecord) {
+                $rolUpper = strtoupper((string) ($userRecord['rol'] ?? ''));
+                $cargoUpper = strtoupper((string) ($userRecord['cargo'] ?? ''));
+                if (str_contains($rolUpper, 'DEPÓSITO') || str_contains($rolUpper, 'DEPOSITO') || str_contains($cargoUpper, 'DEPÓSITO') || str_contains($cargoUpper, 'DEPOSITO')) {
+                    return 'DEPOSITO';
+                }
+                if (strcasecmp((string) $userRecord['rol'], 'Inspector Técnico') === 0 || str_contains($cargoUpper, 'TÉCNICO') || str_contains($cargoUpper, 'TECNICO')) {
+                    return 'TECNICO';
+                }
+                if (strcasecmp((string) $userRecord['rol'], 'Inspector de Tránsito') === 0 || strcasecmp((string) $userRecord['rol'], 'Trabajador') === 0 || str_contains($cargoUpper, 'TRÁNSITO') || str_contains($cargoUpper, 'TRANSITO')) {
+                    return 'TRANSITO';
+                }
+                return null;
+            })(),
 
             'foto_img'        => (new \App\Services\FileStorageService())->urlPublica($userRecord['foto_img'] ?? null) ?? '',
             'sv'              => (int) $userRecord['session_version'],

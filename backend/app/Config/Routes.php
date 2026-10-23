@@ -11,6 +11,8 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
     $routes->match(['get', 'head'], 'files/(:segment)/(:segment)', 'FilesController::ver/$1/$2');
     $routes->match(['get', 'head'], 'inspecciones/(:segment)/pdf', 'InspeccionesController::pdf/$1');
     $routes->match(['get', 'head'], 'mobile/inspecciones/(:segment)/pdf', 'InspeccionesController::pdf/$1');
+    $routes->match(['get', 'head'], 'internamientos/(:segment)/pdf', 'InternamientosController::pdf/$1');
+    $routes->match(['get', 'head'], 'internamientos/(:segment)/pdf-libertad', 'InternamientosController::pdfLibertad/$1');
 
 // Solo jefatura elimina; resolver estas rutas antes del grupo general.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE'], static function ($routes): void {
@@ -37,9 +39,12 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], static function ($
         }
     });
 
-// El encargado del depósito (app móvil) ve los internamientos y completa su inventario; nada más del módulo.
+// El encargado del depósito (app móvil) ve los internamientos, estadísticas y completa su inventario.
     $routes->group('', ['filter' => 'sessionauth:SUPERADMIN,GERENTE,SUBGERENTE,SECRETARIA,ENCARGADO DE DEPÓSITO'], static function ($routes): void {
         $routes->get('internamientos', 'InternamientosController::index');
+        $routes->get('internamientos/estadisticas', 'InternamientosController::estadisticas');
+        $routes->get('internamientos/tarifas', 'InternamientosController::tarifas');
+        $routes->post('internamientos', 'InternamientosController::create');
         // Solo id numérico o uuid (hexadecimal con guiones): así «estadisticas» y «tarifas» siguen yendo a sus rutas
         $routes->get('internamientos/([0-9a-fA-F-]+)', 'InternamientosController::show/$1');
         $routes->put('internamientos/([0-9a-fA-F-]+)', 'InternamientosController::update/$1');

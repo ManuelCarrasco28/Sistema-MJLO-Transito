@@ -27,6 +27,7 @@ import { useRecargaSilenciosa } from '../hooks/useRecargaSilenciosa'
 
 const FILTER_ESTADO_OPTIONS = [
   { value: 'TODOS', label: 'Todos' },
+  { value: 'EN_PROCESO', label: 'En Proceso (En Camino)' },
   { value: 'RETENIDO', label: 'En Depósito' },
   { value: 'LIBERADO', label: 'Liberados' },
 ]
@@ -166,7 +167,7 @@ export function Retenciones({ user }) {
 
   useRecargaSilenciosa('/internamientos', [() => loadInternamientos(), () => loadStats()])
 
-  const [stats, setStats] = useState({ total: 0, enDeposito: 0, liberados: 0, avgDias: 0 })
+  const [stats, setStats] = useState({ total: 0, enProceso: 0, enDeposito: 0, liberados: 0, avgDias: 0 })
 
   const loadStats = () => {
     apiFetch('/internamientos/estadisticas')
@@ -329,6 +330,7 @@ export function Retenciones({ user }) {
   }
 
   const totalInternados = stats.total ?? 0
+  const enProceso = stats.enProceso ?? 0
   const enDeposito = stats.enDeposito ?? 0
   const liberados = stats.liberados ?? 0
   const avgDias = stats.avgDias ?? 0
@@ -439,14 +441,22 @@ export function Retenciones({ user }) {
       return (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap! rounded-full border border-emerald-300/80 bg-emerald-50 px-2.5 py-0.5 text-xs font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 shadow-2xs">
           <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-          {estado}
+          LIBERADO
+        </span>
+      )
+    }
+    if (norm === 'EN_PROCESO' || norm === 'EN PROCESO') {
+      return (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap! rounded-full border border-sky-300/80 bg-sky-50 px-2.5 py-0.5 text-xs font-black text-sky-700 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300 shadow-2xs" title="Vehículo en camino al depósito. Pendiente de inventario físico.">
+          <span className="size-1.5 rounded-full bg-sky-500 shrink-0 animate-pulse" />
+          EN PROCESO
         </span>
       )
     }
     return (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap! rounded-full border border-amber-300/80 bg-amber-50 px-2.5 py-0.5 text-xs font-black text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300 shadow-2xs">
         <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />
-        {estado}
+        RETENIDO
       </span>
     )
   }
@@ -476,6 +486,18 @@ export function Retenciones({ user }) {
           </div>
           <div className="mt-1">
             <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(totalInternados)}</p>
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl border-[1.5px] border-sky-400 bg-white px-3.5 py-2.5 shadow-2xs transition-all hover:shadow-xs dark:border-[var(--border)] dark:bg-[#1C2438] col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">En Proceso</span>
+            <span className="grid size-6 place-items-center rounded-md text-sky-600 dark:text-sky-400">
+              <Icon name="truck" className="size-3.5" />
+            </span>
+          </div>
+          <div className="mt-1">
+            <p className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white leading-tight">{formatNumeroTarjeta(enProceso)}</p>
           </div>
         </div>
 
@@ -586,10 +608,6 @@ export function Retenciones({ user }) {
             <button onClick={handleExportExcel} className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 transition-colors" disabled={isExportingExcel}>
               <Icon name={isExportingExcel ? "refresh" : "fileSpreadsheet"} className={`size-3.5 text-emerald-600 dark:text-emerald-400 ${isExportingExcel ? 'animate-spin' : ''}`} />
               <span>{isExportingExcel ? 'Generando...' : 'Excel'}</span>
-            </button>
-            <button onClick={handleOpenNuevo} className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90" style={{ backgroundColor: 'oklch(62.3% 0.214 259.815)' }}>
-              <span className="text-base leading-none font-black">+</span>
-              <span>Nuevo</span>
             </button>
           </div>
         </div>
@@ -727,10 +745,14 @@ export function Retenciones({ user }) {
                             <button
                               type="button"
                               onClick={() => handleOpenEditar(item)}
-                              className="size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white"
-                              title="Editar internamiento"
+                              className={`size-8 shrink-0 rounded-lg border-[1.5px] grid place-items-center transition-all cursor-pointer shadow-xs active:scale-95 ${
+                                item.estado === 'EN_PROCESO'
+                                  ? 'bg-sky-50 border-sky-300 text-sky-700 hover:bg-sky-500 hover:text-white hover:border-sky-500 dark:bg-sky-950/40 dark:border-sky-800 dark:text-sky-300'
+                                  : 'bg-[var(--action-edit-bg)] border-[var(--action-edit-border)] text-[var(--action-edit-text)] hover:bg-[var(--action-edit-hover)] hover:border-[var(--action-edit-hover)] hover:text-white'
+                              }`}
+                              title={item.estado === 'EN_PROCESO' ? "Realizar Inventario de Ingreso al Depósito" : "Editar internamiento"}
                             >
-                              <Icon name="pencil" className="size-4" />
+                              <Icon name={item.estado === 'EN_PROCESO' ? "clipboard-list" : "pencil"} className="size-4" />
                             </button>
                           </>
                         )}
@@ -774,12 +796,29 @@ export function Retenciones({ user }) {
                 <span className="grid size-9 place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-[var(--bg-subtle)] dark:text-slate-300">
                   <Icon name="garage" className="size-4.5" />
                 </span>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">{editandoItem ? `Editar Internamiento ${editandoItem.numeroBoleta}` : 'Nuevo Internamiento'}</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {editandoItem
+                    ? (editandoItem.estado === 'EN_PROCESO'
+                        ? `Inventario de Ingreso — ${editandoItem.numeroBoleta}`
+                        : `Editar Internamiento ${editandoItem.numeroBoleta}`)
+                    : 'Nuevo Internamiento'}
+                </h3>
               </div>
               <BotonCerrarModal onClick={() => setIsNuevoModalOpen(false)} title="Cerrar" />
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+              {editandoItem?.estado === 'EN_PROCESO' && (
+                <div className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50/90 px-4 py-3 text-sky-900 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-200">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-sky-500 text-white shadow-xs">
+                    <Icon name="truck" className="size-4" />
+                  </span>
+                  <div className="text-xs">
+                    <p className="font-bold text-sky-950 dark:text-sky-100">Vehículo en camino al depósito (En Proceso)</p>
+                    <p className="text-sky-700 dark:text-sky-300">Complete el inventario físico para registrar su ingreso formal. Al guardar, pasará automáticamente a estado <b>RETENIDO</b>.</p>
+                  </div>
+                </div>
+              )}
               <fieldset className="rounded-xl border border-slate-200 p-3.5 dark:border-[var(--border-strong)]">
                 <legend className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-900 dark:text-white">Papeleta de Origen</legend>
                 <div className="relative">
@@ -957,7 +996,7 @@ export function Retenciones({ user }) {
             <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/80 px-5 py-3 dark:border-[var(--border)] dark:bg-[#1C2438]">
               <BotonCancelar onClick={() => setIsNuevoModalOpen(false)} />
               <BotonGuardar disabled={registrando}>
-                {registrando ? 'Guardando...' : (editandoItem ? 'Guardar cambios' : 'Registrar Internamiento')}
+                {registrando ? 'Guardando...' : (editandoItem ? (editandoItem.estado === 'EN_PROCESO' ? 'Completar Inventario e Ingresar' : 'Guardar cambios') : 'Registrar Internamiento')}
               </BotonGuardar>
             </div>
           </form>

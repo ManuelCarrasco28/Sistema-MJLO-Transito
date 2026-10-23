@@ -198,7 +198,7 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
   void _marcarTodoBien() {
     setState(() {
       for (final c in _criterios) {
-        final id = c['id'] as int;
+        final id = int.tryParse(c['id']?.toString() ?? '') ?? 0;
         _evaluaciones[id] = 'BIEN';
       }
     });
@@ -398,7 +398,7 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
 
     try {
       final detallesPayload = _criterios.map((c) {
-        final id = c['id'] as int;
+        final id = int.tryParse(c['id']?.toString() ?? '') ?? 0;
         return {
           'criterioId': id,
           'estado': _evaluaciones[id] ?? 'BIEN',
@@ -1037,7 +1037,7 @@ class _TechnicalInspectionScreenState extends State<TechnicalInspectionScreen> {
                                 const SizedBox(height: 8),
 
                                 ...items.map((crit) {
-                                  final id = crit['id'] as int;
+                                  final id = int.tryParse(crit['id']?.toString() ?? '') ?? 0;
                                   final codigo = crit['codigo']?.toString() ?? '';
                                   final nombre = crit['nombre']?.toString() ?? '';
                                   final estado = _evaluaciones[id] ?? '';

@@ -161,12 +161,19 @@ class PapeletasController extends ResourceController
 
             $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
 
-            $sesion = \App\Libraries\Acceso::usuario();
-            if (!\App\Libraries\Acceso::esOficina($sesion)) {
-                $inspectorId = (int) ($sesion['id_persona'] ?? -1);
-            }
             $dni = $this->request->getGet('dni');
             $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
+
+            $sesion = \App\Libraries\Acceso::usuario();
+            // Si se consulta por placa o DNI, cualquier inspector ve el historial completo de la municipalidad.
+            // Si es el listado general de actividades sin filtro, el inspector solo ve sus propios registros.
+            if (!\App\Libraries\Acceso::esOficina($sesion) && !\App\Libraries\Acceso::esEncargadoDeposito($sesion)) {
+                if (empty($placa) && empty($dni)) {
+                    $inspectorId = (int) ($sesion['id_persona'] ?? -1);
+                } else {
+                    $inspectorId = 0;
+                }
+            }
         $papeletaId = (int)$this->request->getGet('papeletaId');
         if ($papeletaId > 0) $builder->where('p.id', $papeletaId);
         $buscar = trim((string)$this->request->getGet('buscar'));

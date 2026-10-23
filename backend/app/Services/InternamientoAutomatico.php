@@ -22,8 +22,8 @@ class InternamientoAutomatico
         }
     }
 
-/**
-     * @return array{id?: int, numeroBoleta?: string, omitido?: string}
+    /**
+     * @return array{id?: int, numeroBoleta?: string, omitido?: string, vinculado?: bool}
      */
     public function generar(int $idPapeleta): array
     {
@@ -36,13 +36,74 @@ class InternamientoAutomatico
         }
         $idVehiculo = (int) $papeleta['id_vehiculo'];
 
-        if ($this->db->table('ordenes_internamiento')->where('id_papeleta', $idPapeleta)->countAllResults() > 0) {
-            return ['omitido' => 'La papeleta ya tiene un internamiento registrado.'];
+        $existentePapeleta = $this->db->table('ordenes_internamiento')
+            ->select('id, numero_boleta')
+            ->where('id_papeleta', $idPapeleta)
+            ->get()->getRowArray();
+        if ($existentePapeleta) {
+            return [
+                'id' => (int) $existentePapeleta['id'],
+                'numeroBoleta' => $existentePapeleta['numero_boleta'],
+                'omitido' => 'La papeleta ya tiene un internamiento registrado.',
+            ];
         }
-        $retenido = $this->db->table('ordenes_internamiento')->select('numero_boleta')
-            ->where('id_vehiculo', $idVehiculo)->where('estado', 'RETENIDO')->get()->getRowArray();
-        if ($retenido) {
-            return ['omitido' => 'El vehículo ya está retenido en el depósito (boleta ' . ($retenido['numero_boleta'] ?? 's/n') . ').'];
+
+        // Si la papeleta proviene de un reporte de intervención que ya tiene internamiento
+        $reporteOrigen = $this->db->table('reportes_intervencion')
+            ->select('id')
+            ->where('id_papeleta', $idPapeleta)
+            ->get()->getRowArray();
+        if ($reporteOrigen) {
+            $ordenReporte = $this->db->table('ordenes_internamiento')
+                ->select('id, numero_boleta')
+                ->where('id_reporte', (int)$reporteOrigen['id'])
+                ->get()->getRowArray();
+            if ($ordenReporte) {
+                $this->db->table('ordenes_internamiento')
+                    ->where('id', (int) $ordenReporte['id'])
+                    ->update([
+                        'id_papeleta' => $idPapeleta,
+                        'motivo' => 'Generado con la papeleta N° ' . ($papeleta['numero_papeleta'] ?? $idPapeleta),
+                    ]);
+
+                return [
+                    'id' => (int) $ordenReporte['id'],
+                    'numeroBoleta' => $ordenReporte['numero_boleta'],
+                    'vinculado' => true,
+                ];
+            }
+        }
+
+        $activo = $this->db->table('ordenes_internamiento')
+            ->select('id, id_papeleta, id_reporte, numero_boleta, estado')
+            ->where('id_vehiculo', $idVehiculo)
+            ->whereIn('estado', ['RETENIDO', 'EN_PROCESO'])
+            ->get()->getRowArray();
+        if ($activo) {
+            if (empty($activo['id_papeleta'])) {
+                $this->db->table('ordenes_internamiento')
+                    ->where('id', (int) $activo['id'])
+                    ->update([
+                        'id_papeleta' => $idPapeleta,
+                        'motivo' => 'Generado con la papeleta N° ' . ($papeleta['numero_papeleta'] ?? $idPapeleta),
+                    ]);
+
+                return [
+                    'id' => (int) $activo['id'],
+                    'numeroBoleta' => $activo['numero_boleta'],
+                    'vinculado' => true,
+                ];
+            }
+
+            $mensajeEstado = $activo['estado'] === 'EN_PROCESO'
+                ? 'en proceso de traslado al depósito'
+                : 'retenido en el depósito';
+
+            return [
+                'id' => (int) $activo['id'],
+                'numeroBoleta' => $activo['numero_boleta'],
+                'omitido' => 'El vehículo ya está ' . $mensajeEstado . ' (boleta ' . ($activo['numero_boleta'] ?? 's/n') . ').',
+            ];
         }
 
         if (!$this->candado) {
@@ -63,6 +124,7 @@ class InternamientoAutomatico
         $this->db->table('ordenes_internamiento')->insert([
             'uuid' => \App\Libraries\Identificador::nuevo(),
             'id_papeleta' => $idPapeleta,
+            'id_reporte' => $reporteOrigen ? (int)$reporteOrigen['id'] : null,
             'id_vehiculo' => $idVehiculo,
             'numero_boleta' => $numeroBoleta,
             'id_remisor' => $idRemisor,
@@ -76,7 +138,110 @@ class InternamientoAutomatico
             'autoridad_que_dispone' => self::cargoDelInspector($this->db, $papeleta),
             'estado_carroceria' => self::carroceriaDelVehiculo($this->db, $idVehiculo),
             'observaciones' => '',
-            'estado' => 'RETENIDO',
+            'estado' => 'EN_PROCESO',
+        ]);
+
+        return ['id' => (int) $this->db->insertID(), 'numeroBoleta' => $numeroBoleta];
+    }
+
+    /**
+     * Genera una orden de internamiento en estado EN_PROCESO directamente desde un reporte de intervención.
+     * Al registrarse el inventario físico en el depósito pasará a RETENIDO.
+     * @return array{id?: int, numeroBoleta?: string, omitido?: string, vinculado?: bool}
+     */
+    public function generarDesdeReporte(int $idReporte): array
+    {
+        $reporte = $this->db->table('reportes_intervencion')->where('id', $idReporte)->get()->getRowArray();
+        if (!$reporte) {
+            return ['omitido' => 'No se encontró el reporte de intervención.'];
+        }
+
+        $idVehiculo = !empty($reporte['id_vehiculo']) ? (int) $reporte['id_vehiculo'] : null;
+        if (!$idVehiculo && !empty($reporte['placa'])) {
+            $idVehiculo = \App\Services\VehiculoPorPlaca::resolverOCrear($this->db, (string) $reporte['placa']);
+            if ($idVehiculo) {
+                $this->db->table('reportes_intervencion')->where('id', $idReporte)->update(['id_vehiculo' => $idVehiculo]);
+            }
+        }
+
+        if (!$idVehiculo) {
+            return ['omitido' => 'El reporte no tiene un vehículo identificado para internamiento.'];
+        }
+
+        $existenteReporte = $this->db->table('ordenes_internamiento')
+            ->select('id, numero_boleta')
+            ->where('id_reporte', $idReporte)
+            ->get()->getRowArray();
+        if ($existenteReporte) {
+            return [
+                'id' => (int) $existenteReporte['id'],
+                'numeroBoleta' => $existenteReporte['numero_boleta'],
+                'omitido' => 'El reporte ya tiene un internamiento registrado.',
+            ];
+        }
+
+        $activo = $this->db->table('ordenes_internamiento')
+            ->select('id, id_papeleta, id_reporte, numero_boleta, estado')
+            ->where('id_vehiculo', $idVehiculo)
+            ->whereIn('estado', ['RETENIDO', 'EN_PROCESO'])
+            ->get()->getRowArray();
+        if ($activo) {
+            if (empty($activo['id_reporte'])) {
+                $this->db->table('ordenes_internamiento')
+                    ->where('id', (int) $activo['id'])
+                    ->update(['id_reporte' => $idReporte]);
+
+                return [
+                    'id' => (int) $activo['id'],
+                    'numeroBoleta' => $activo['numero_boleta'],
+                    'vinculado' => true,
+                ];
+            }
+
+            $mensajeEstado = $activo['estado'] === 'EN_PROCESO'
+                ? 'en proceso de traslado al depósito'
+                : 'retenido en el depósito';
+
+            return [
+                'id' => (int) $activo['id'],
+                'numeroBoleta' => $activo['numero_boleta'],
+                'omitido' => 'El vehículo ya está ' . $mensajeEstado . ' (boleta ' . ($activo['numero_boleta'] ?? 's/n') . ').',
+            ];
+        }
+
+        if (!$this->candado) {
+            $this->candado = (int) ($this->db->query("SELECT GET_LOCK('mjlo_numero_internamiento', 10) AS ok")->getRowArray()['ok'] ?? 0) === 1;
+            if (!$this->candado) {
+                throw new \RuntimeException('El sistema está generando otro internamiento. Intente nuevamente.');
+            }
+        }
+        $ultima = (int) ($this->db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(numero_boleta, 5) AS UNSIGNED)), 0) AS m FROM ordenes_internamiento WHERE numero_boleta REGEXP '^BOL-[0-9]+$'")->getRowArray()['m'] ?? 0);
+        $numeroBoleta = 'BOL-' . str_pad((string) ($ultima + 1), 6, '0', STR_PAD_LEFT);
+
+        $idRemisor = null;
+        if (!empty($reporte['id_inspector'])) {
+            $remisor = $this->db->table('trabajadores')->where('id_persona', (int) $reporte['id_inspector'])->where('estado', 'ACTIVO')->get()->getRowArray();
+            $idRemisor = $remisor ? (int) $reporte['id_inspector'] : null;
+        }
+
+        $this->db->table('ordenes_internamiento')->insert([
+            'uuid' => \App\Libraries\Identificador::nuevo(),
+            'id_papeleta' => null,
+            'id_reporte' => $idReporte,
+            'id_vehiculo' => $idVehiculo,
+            'numero_boleta' => $numeroBoleta,
+            'id_remisor' => $idRemisor,
+            'id_interesado' => !empty($reporte['id_conductor']) ? (int) $reporte['id_conductor'] : null,
+            'fecha_ingreso' => self::fechaDeIngreso($reporte),
+            'deposito' => self::DEPOSITO_OFICIAL,
+            'motivo' => 'Generado con el reporte REP N° ' . $idReporte,
+            'lugar_intervencion' => trim((string) ($reporte['lugar'] ?? '')),
+            'grado_remisor' => self::cargoDelInspector($this->db, ['id_inspector' => $reporte['id_inspector']]),
+            'carnet_remisor' => self::carneDelInspector($this->db, ['id_inspector' => $reporte['id_inspector']]),
+            'autoridad_que_dispone' => self::cargoDelInspector($this->db, ['id_inspector' => $reporte['id_inspector']]),
+            'estado_carroceria' => self::carroceriaDelVehiculo($this->db, $idVehiculo),
+            'observaciones' => trim((string) ($reporte['observaciones'] ?? '')),
+            'estado' => 'EN_PROCESO',
         ]);
 
         return ['id' => (int) $this->db->insertID(), 'numeroBoleta' => $numeroBoleta];

@@ -702,7 +702,7 @@ class _HistoryScreenState extends State<HistoryScreen> with RouteAware {
   Widget _buildListActividades(List<dynamic> list) {
     if (list.isEmpty) {
       final String mensaje = (widget.filterDni != null || widget.filterPlaca != null)
-          ? 'No hay papeletas ni reportes tuyos para esta consulta. Solo ves los que tú registraste; en la oficina se ve el historial completo.'
+          ? 'No hay infracciones, papeletas ni reportes registrados en la Municipalidad de JLO para esta consulta.'
           : 'No tienes actividades registradas';
 
       return Center(

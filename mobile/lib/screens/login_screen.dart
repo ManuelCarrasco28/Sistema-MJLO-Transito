@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
 import '../utils/animaciones.dart';
+import 'depot_home_screen.dart';
 import 'home_screen.dart';
 import 'technical_home_screen.dart';
 
@@ -70,14 +71,16 @@ class _LoginScreenState extends State<LoginScreen> {
         _recordarUsuario,
       );
 
+      final esDeposito = await ApiService.esEncargadoDeposito();
       final esTecnico = await ApiService.esInspectorTecnico();
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                esTecnico ? const TechnicalHomeScreen() : const HomeScreen(),
+            builder: (_) => esDeposito
+                ? const DepotHomeScreen()
+                : (esTecnico ? const TechnicalHomeScreen() : const HomeScreen()),
           ),
         );
       }

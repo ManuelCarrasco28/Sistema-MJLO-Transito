@@ -53,11 +53,18 @@ class ReportesIntervencionController extends ResourceController
 
         $inspectorId = (int)($this->request->getGet('inspector_id') ?? 0);
         $sesion = \App\Libraries\Acceso::usuario();
-        if (!\App\Libraries\Acceso::esOficina($sesion)) {
-            $inspectorId = (int) ($sesion['id_persona'] ?? -1);
-        }
         $dni = $this->request->getGet('dni');
         $placa = \App\Libraries\Placa::normalizar($this->request->getGet('placa'));
+
+        // Si se consulta por placa o DNI, cualquier inspector ve el historial completo de la municipalidad.
+        // Si es el listado general de actividades sin filtro, el inspector solo ve sus propios registros.
+        if (!\App\Libraries\Acceso::esOficina($sesion)) {
+            if (empty($placa) && empty($dni)) {
+                $inspectorId = (int) ($sesion['id_persona'] ?? -1);
+            } else {
+                $inspectorId = 0;
+            }
+        }
 
         if ($inspectorId > 0) {
             $query->where('r.id_inspector', $inspectorId);
@@ -246,6 +253,13 @@ class ReportesIntervencionController extends ResourceController
         if ($placa !== '' && $placa !== 'SIN_PLACA') {
             $vehiculo = $db->table('vehiculos')->where('placa', $placa)->get()->getRowArray();
             $vehiculoId = $vehiculo ? (int)$vehiculo['id'] : null;
+            if (!$vehiculoId) {
+                $vehiculoId = \App\Services\VehiculoPorPlaca::resolverOCrear($db, $placa, [
+                    'clase' => (string)($input['claseVehiculo'] ?? ''),
+                    'marca' => (string)($input['marcaVehiculo'] ?? ''),
+                    'color' => (string)($input['colorVehiculo'] ?? ''),
+                ]);
+            }
         }
 
         $ahoraLima = new \DateTime('now', new \DateTimeZone('America/Lima'));
@@ -359,8 +373,11 @@ class ReportesIntervencionController extends ResourceController
                 }
             }
 
+            $internamientoAuto = new \App\Services\InternamientoAutomatico($db);
+            $internamiento = $internamientoAuto->generarDesdeReporte($id);
+
             $db->transCommit();
-            return $this->respondCreated(['message' => 'Reporte registrado para revisión administrativa.', 'data' => ['id' => $id]]);
+            return $this->respondCreated(['message' => 'Reporte registrado para revisión administrativa.', 'data' => ['id' => $id, 'internamiento' => $internamiento]]);
         } catch (\Throwable $e) {
             $db->transRollback();
             \App\Services\FileStorageService::descartarEscritos();
