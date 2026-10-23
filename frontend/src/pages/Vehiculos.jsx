@@ -614,21 +614,6 @@ export function Vehiculos({ user }) {
 
     setIsBuscandoSunarpModal(true)
     try {
-      if (!isEditing) {
-        try {
-          const checkRes = await apiFetch(`/vehiculos?page=1&buscar=${encodeURIComponent(plate)}&porPagina=5`)
-          if (checkRes.ok) {
-            const checkData = await checkRes.json()
-            const yaExiste = (checkData.data || []).find(v => (v.placa || '').toUpperCase() === plate)
-            if (yaExiste) {
-              showWarning('Vehículo Ya Registrado', `El vehículo con placa ${plate} ya se encuentra registrado en el padrón municipal. Puede buscarlo en el listado para revisar o actualizar sus datos.`)
-              setIsBuscandoSunarpModal(false)
-              return
-            }
-          }
-        } catch { /* continuar con búsqueda sunarp */ }
-      }
-
       const response = await apiFetch('/pide/sunarp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -636,13 +621,15 @@ export function Vehiculos({ user }) {
       })
 
       if (!response.ok) {
-        throw new Error(await leerMensajeError(response, 'No se pudo consultar la información del vehículo en SUNARP.'))
+        const errData = await response.json().catch(() => ({}))
+        const msg = errData.message || (typeof errData.messages === 'object' ? Object.values(errData.messages).flat().join('\n') : errData.messages?.error) || `No se encontró la placa en ninguna oficina registral de la zona ${oficinaReg.codeZona || '11'}. Puede buscar en otra zona.`
+        throw new Error(msg)
       }
 
       const res = await response.json()
       const sunarpData = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
       if (!sunarpData) {
-        throw new Error(res.message || 'No se encontraron registros para la placa ingresada.')
+        throw new Error(res.message || `No se encontró la placa en ninguna oficina registral de la zona ${oficinaReg.codeZona || '11'}. Puede buscar en otra zona.`)
       }
 
       const cat = (sunarpData.categoria || '').toUpperCase().trim()

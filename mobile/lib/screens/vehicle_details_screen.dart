@@ -555,70 +555,9 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
           ],
 
           const SizedBox(height: 32),
-          _buildSectionTitle('Estado de Documentos', Icons.verified_user),
+          _buildSectionTitle('Documentos del Vehículo', Icons.verified_user),
           Builder(
             builder: (context) {
-              final rawId = _vehicleData!['id'];
-              final isUnregistered = (rawId == null || rawId == 0 || rawId == '0');
-              
-              if (isUnregistered && _documents.isEmpty) {
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 48),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Vehículo no registrado en el padrón municipal',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Esta unidad no figura en la base de datos de la municipalidad de JLO.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              if (_documents.isEmpty) {
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.amber.shade300),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 44),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Sin permisos de transporte registrados',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontSize: 15),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'El vehículo se encuentra registrado en el padrón municipal como servicio particular / no asociado.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.amber.shade900, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              
               final allDocs = _obtenerListaDocumentos();
 
               return ListView.builder(
@@ -867,16 +806,16 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                       ),
                     if (fechaIniDisplay.isNotEmpty && fechaFinDisplay.isNotEmpty)
                       Text(
-                        'Inicio: $fechaIniDisplay  •  Vence: $fechaFinDisplay',
+                        'Desde: $fechaIniDisplay  •  ${isExpired ? 'Venció el' : 'Vence'}: $fechaFinDisplay',
                         style: TextStyle(
                           color: isExpired ? Colors.red.shade700 : Colors.grey.shade600,
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: isExpired ? FontWeight.bold : FontWeight.w500,
                         ),
                       )
                     else if (fechaFinDisplay.isNotEmpty)
                       Text(
-                        'Vence: $fechaFinDisplay',
+                        '${isExpired ? 'Venció el' : 'Vence'}: $fechaFinDisplay',
                         style: TextStyle(
                           color: isExpired ? Colors.red.shade700 : Colors.grey.shade600,
                           fontSize: 12,
@@ -885,7 +824,7 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
                       )
                     else if (fechaIniDisplay.isNotEmpty)
                       Text(
-                        'Inicio: $fechaIniDisplay',
+                        'Desde: $fechaIniDisplay',
                         style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                       ),
                   ],

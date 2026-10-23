@@ -940,32 +940,6 @@ class _RegisterAlienVehicleScreenState
                     ),
                   ],
                 ),
-              )
-            else if (!isFormal)
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade300),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.info_outline_rounded, color: Colors.amber.shade800, size: 28),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Unidad registrada en el padrón municipal como servicio particular / no asociado',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.amber.shade900,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             _buildSummaryRow(
               'MARCA',

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiFetch, leerMensajeError } from '../../config/api'
-import { showError, showToast } from '../../utils/SwalUtil'
+import { showError, showWarning, showToast } from '../../utils/SwalUtil'
 import { VehiculoFormModal } from './VehiculoFormModal'
 import { useOficinaRegistral } from '../../hooks/useOficinaRegistral'
 import { usePersonaRapida } from '../../hooks/usePersonaRapida'
@@ -109,13 +109,15 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
       })
       
       if (!response.ok) {
-        throw new Error('No se pudo encontrar información para esta placa en los registros públicos.')
+        const errData = await response.json().catch(() => ({}))
+        const msg = errData.message || (typeof errData.messages === 'object' ? Object.values(errData.messages).flat().join('\n') : errData.messages?.error) || `No se encontró la placa en ninguna oficina registral de la zona ${oficinaReg.codeZona || '11'}. Puede buscar en otra zona.`
+        throw new Error(msg)
       }
       
       const res = await response.json()
       const sunarpData = res.data || (res.success && res.data ? res.data : (res.placa ? res : null))
       if (!sunarpData) {
-        throw new Error('No se encontraron registros para la placa ingresada.')
+        throw new Error(`No se encontró la placa en ninguna oficina registral de la zona ${oficinaReg.codeZona || '11'}. Puede buscar en otra zona.`)
       }
       
       setFormData(prev => ({
@@ -147,7 +149,7 @@ export function StandaloneVehiculoFormModal({ onClose, onSuccess, placaInicial =
       }
       showToast('Datos cargados', 'success')
     } catch (err) {
-      showError('Consulta Fallida', err.message || 'No se pudo obtener la información. Verifique que la placa sea correcta y vuelva a intentarlo.')
+      showWarning('Advertencia', err.message || `No se encontró la placa en ninguna oficina registral de la zona ${oficinaReg.codeZona || '11'}. Puede buscar en otra zona.`)
     } finally {
       setIsBuscandoSunarp(false)
     }
