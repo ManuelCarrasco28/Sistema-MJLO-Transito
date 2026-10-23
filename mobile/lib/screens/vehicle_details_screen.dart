@@ -558,6 +558,32 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> with Single
           _buildSectionTitle('Documentos del Vehículo', Icons.verified_user),
           Builder(
             builder: (context) {
+              final rawId = _vehicleData!['id'];
+              final isUnregistered = (rawId == null || rawId == 0 || rawId == '0');
+
+              if (isUnregistered) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 48),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Vehículo no registrado en la municipalidad de JLO',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
               final allDocs = _obtenerListaDocumentos();
 
               return ListView.builder(
